@@ -1,0 +1,1242 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SafeSight API — Informe Técnico</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #232634;
+      --border: #2e3248;
+      --accent: #6c8ef5;
+      --accent2: #a78bfa;
+      --green: #4ade80;
+      --yellow: #fbbf24;
+      --red: #f87171;
+      --blue: #60a5fa;
+      --teal: #2dd4bf;
+      --text: #e2e8f0;
+      --text-muted: #8892aa;
+      --radius: 10px;
+      --font-mono: "Fira Code", "Cascadia Code", "Consolas", monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+      font-size: 15px;
+      line-height: 1.65;
+    }
+
+    /* ─── Layout ─────────────────────────────────────────── */
+    .sidebar {
+      position: fixed;
+      top: 0; left: 0;
+      width: 240px;
+      height: 100vh;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      padding: 28px 0 40px;
+    }
+
+    .sidebar-logo {
+      padding: 0 20px 24px;
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: -0.3px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sidebar-logo span { font-size: 22px; }
+
+    .sidebar-section {
+      padding: 6px 20px 2px;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-top: 14px;
+    }
+
+    .sidebar a {
+      display: block;
+      padding: 6px 20px;
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 13px;
+      transition: color 0.15s, background 0.15s;
+      border-left: 2px solid transparent;
+    }
+
+    .sidebar a:hover {
+      color: var(--text);
+      background: rgba(108,142,245,0.08);
+      border-left-color: var(--accent);
+    }
+
+    .main {
+      margin-left: 240px;
+      padding: 48px 56px 80px;
+      max-width: 960px;
+    }
+
+    /* ─── Header ─────────────────────────────────────────── */
+    .page-header {
+      margin-bottom: 48px;
+      padding-bottom: 28px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .page-header h1 {
+      font-size: 34px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: #fff;
+      line-height: 1.2;
+    }
+
+    .page-header p {
+      margin-top: 10px;
+      color: var(--text-muted);
+      font-size: 15px;
+    }
+
+    .badge-row { margin-top: 16px; display: flex; gap: 8px; flex-wrap: wrap; }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .badge-blue  { background: rgba(96,165,250,0.15); color: var(--blue); }
+    .badge-teal  { background: rgba(45,212,191,0.15); color: var(--teal); }
+    .badge-purple{ background: rgba(167,139,250,0.15); color: var(--accent2); }
+
+    /* ─── Section titles ─────────────────────────────────── */
+    h2 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #fff;
+      margin: 52px 0 20px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    h3 {
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--accent);
+      margin: 32px 0 12px;
+    }
+
+    h4 {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin: 18px 0 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+
+    p { margin: 8px 0; color: var(--text-muted); }
+
+    /* ─── Method badges ──────────────────────────────────── */
+    .method {
+      display: inline-block;
+      padding: 2px 9px;
+      border-radius: 5px;
+      font-size: 11px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      letter-spacing: 0.5px;
+      min-width: 54px;
+      text-align: center;
+    }
+
+    .GET    { background: rgba(74,222,128,0.15);  color: var(--green);  }
+    .POST   { background: rgba(96,165,250,0.15);  color: var(--blue);   }
+    .PATCH  { background: rgba(251,191,36,0.15);  color: var(--yellow); }
+    .DELETE { background: rgba(248,113,113,0.15); color: var(--red);    }
+
+    /* ─── Endpoint card ──────────────────────────────────── */
+    .endpoint-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 20px;
+      overflow: hidden;
+    }
+
+    .endpoint-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 20px;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .endpoint-header code {
+      font-family: var(--font-mono);
+      font-size: 14px;
+      color: var(--text);
+    }
+
+    .endpoint-desc {
+      margin-left: auto;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .endpoint-body {
+      padding: 16px 20px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .endpoint-body.single { grid-template-columns: 1fr; }
+
+    .endpoint-section-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    /* ─── Code blocks ────────────────────────────────────── */
+    pre {
+      background: rgba(0,0,0,0.35);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 12px 14px;
+      overflow-x: auto;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      line-height: 1.7;
+    }
+
+    pre code { color: #c8d3f5; }
+
+    .key   { color: #86e1fc; }
+    .str   { color: #c3e88d; }
+    .num   { color: #ff966c; }
+    .bool  { color: var(--accent2); }
+    .null  { color: var(--text-muted); }
+    .type  { color: var(--yellow); }
+    .cmt   { color: #4e5a72; font-style: italic; }
+
+    /* ─── DB table ───────────────────────────────────────── */
+    .db-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 28px;
+      overflow: hidden;
+    }
+
+    .db-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 20px;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .db-header .db-name {
+      font-family: var(--font-mono);
+      font-size: 15px;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .db-header .db-tag {
+      margin-left: auto;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .db-body { padding: 0; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    thead th {
+      background: rgba(0,0,0,0.25);
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      padding: 8px 16px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    tbody td {
+      padding: 9px 16px;
+      border-bottom: 1px solid rgba(46,50,72,0.6);
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      vertical-align: top;
+    }
+
+    tbody tr:last-child td { border-bottom: none; }
+
+    tbody tr:hover { background: rgba(108,142,245,0.04); }
+
+    .col-name { color: #86e1fc; }
+    .col-type { color: var(--yellow); }
+    .col-key  { color: var(--accent2); font-size: 11px; font-weight: 600; }
+    .col-desc { color: var(--text-muted); font-family: inherit; font-size: 12px; }
+
+    .pk-badge {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      margin-right: 4px;
+    }
+
+    .pk  { background: rgba(251,191,36,0.2); color: var(--yellow); }
+    .ck  { background: rgba(167,139,250,0.2); color: var(--accent2); }
+    .fk  { background: rgba(45,212,191,0.2); color: var(--teal); }
+    .idx { background: rgba(96,165,250,0.2); color: var(--blue); }
+
+    .db-note {
+      padding: 12px 16px;
+      background: rgba(108,142,245,0.06);
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--text-muted);
+      border-radius: 0 0 var(--radius) var(--radius);
+    }
+
+    .db-note strong { color: var(--accent); }
+
+    /* ─── Flow diagram (text) ────────────────────────────── */
+    .flow-box {
+      background: rgba(0,0,0,0.3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 22px;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      line-height: 2;
+      color: #c8d3f5;
+      margin: 16px 0;
+    }
+
+    .flow-arrow { color: var(--accent); }
+    .flow-node  { color: var(--teal); }
+    .flow-store { color: var(--yellow); }
+
+    /* ─── Misc ───────────────────────────────────────────── */
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 40px 0;
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin: 20px 0;
+    }
+
+    .info-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+
+    .info-card .label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.7px; }
+    .info-card .value { font-size: 22px; font-weight: 700; color: #fff; margin-top: 4px; }
+    .info-card .sub   { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+    @media (max-width: 900px) {
+      .sidebar { display: none; }
+      .main { margin-left: 0; padding: 24px; }
+      .endpoint-body { grid-template-columns: 1fr; }
+      .info-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ════════════════ SIDEBAR ════════════════ -->
+<nav class="sidebar">
+  <div class="sidebar-logo"><span>&#x1F441;</span> SafeSight API</div>
+
+  <div class="sidebar-section">Endpoints</div>
+  <a href="#alerts">Alertas</a>
+  <a href="#reports">Reportes</a>
+  <a href="#stats">Estadísticas</a>
+  <a href="#notifications">Notificaciones</a>
+
+  <div class="sidebar-section">Bases de datos</div>
+  <a href="#mongodb">MongoDB</a>
+  <a href="#cassandra">Cassandra</a>
+
+  <div class="sidebar-section">Arquitectura</div>
+  <a href="#flow">Flujo de datos</a>
+  <a href="#response">Formato ApiResult</a>
+</nav>
+
+<!-- ════════════════ MAIN ════════════════ -->
+<main class="main">
+
+  <!-- Header -->
+  <div class="page-header">
+    <h1>SafeSight — Informe Técnico de API</h1>
+    <p>Documentación de endpoints REST y estructuras de datos para el cliente Android</p>
+    <div class="badge-row">
+      <span class="badge badge-blue">.NET 10 / ASP.NET Core</span>
+      <span class="badge badge-teal">MongoDB 10.0</span>
+      <span class="badge badge-purple">Apache Cassandra 3.x</span>
+    </div>
+  </div>
+
+  <!-- Resumen -->
+  <div class="info-grid">
+    <div class="info-card">
+      <div class="label">Endpoints totales</div>
+      <div class="value">12</div>
+      <div class="sub">4 controllers</div>
+    </div>
+    <div class="info-card">
+      <div class="label">Colecciones MongoDB</div>
+      <div class="value">2</div>
+      <div class="sub">alerts · heatmap_cells</div>
+    </div>
+    <div class="info-card">
+      <div class="label">Tablas Cassandra</div>
+      <div class="value">3</div>
+      <div class="sub">citizen_reports + 2</div>
+    </div>
+  </div>
+
+  <!-- ═══ FORMATO GENERAL ═══ -->
+  <h2 id="response">Formato general de respuesta</h2>
+  <p>Todos los endpoints devuelven un wrapper <code>ApiResult&lt;T&gt;</code>:</p>
+  <pre><code><span class="cmt">// Éxito</span>
+{
+  <span class="key">"success"</span>: <span class="bool">true</span>,
+  <span class="key">"data"</span>:    <span class="cmt">/* objeto o array según el endpoint */</span>,
+  <span class="key">"error"</span>:   <span class="null">null</span>
+}
+
+<span class="cmt">// Error</span>
+{
+  <span class="key">"success"</span>: <span class="bool">false</span>,
+  <span class="key">"data"</span>:    <span class="null">null</span>,
+  <span class="key">"error"</span>:   <span class="str">"Mensaje de error legible"</span>
+}</code></pre>
+
+  <p>Las respuestas paginadas usan <code>PagedResponse&lt;T&gt;</code> como valor de <code>data</code>:</p>
+  <pre><code>{
+  <span class="key">"items"</span>:      <span class="cmt">[ ... ]</span>,
+  <span class="key">"page"</span>:       <span class="num">1</span>,
+  <span class="key">"pageSize"</span>:   <span class="num">20</span>,
+  <span class="key">"totalItems"</span>: <span class="num">84</span>,
+  <span class="key">"totalPages"</span>: <span class="num">5</span>
+}</code></pre>
+
+  <!-- ═══ ENDPOINTS — ALERTAS ═══ -->
+  <h2 id="alerts">Alertas <code style="font-size:14px;color:var(--text-muted)">/api/alerts</code></h2>
+
+  <!-- GET /api/alerts -->
+  <div class="endpoint-card">
+    <div class="endpoint-header">
+      <span class="method GET">GET</span>
+      <code>/api/alerts</code>
+      <span class="endpoint-desc">Lista paginada de alertas activas</span>
+    </div>
+    <div class="endpoint-body">
+      <div>
+        <div class="endpoint-section-title">Query params</div>
+        <pre><code><span class="key">page</span>     <span class="type">int</span>  <span class="cmt">default: 1</span>
+<span class="key">pageSize</span> <span class="type">int</span>  <span class="cmt">default: 20  (max: 100)</span></code></pre>
+      </div>
+      <div>
+        <div class="endpoint-section-title">Respuesta — data</div>
+        <pre><code><span class="cmt">PagedResponse&lt;AlertResponse&gt;</span>
+<span class="key">"items"</span>: [
+  {
+    <span class="key">"id"</span>:                   <span class="type">string</span>,
+    <span class="key">"firstName"</span>:            <span class="type">string</span>,
+    <span class="key">"lastName"</span>:             <span class="type">string</span>,
+    <span class="key">"age"</span>:                  <span class="type">int</span>,
+    <span class="key">"physicalDescription"</span>:  <span class="type">string</span>,
+    <span class="key">"photoUrl"</span>:             <span class="type">string</span>,
+    <span class="key">"situation"</span>:            <span class="type">string</span>,
+    <span class="key">"lastKnownLatitude"</span>:    <span class="type">double</span>,
+    <span class="key">"lastKnownLongitude"</span>:   <span class="type">double</span>,
+    <span class="key">"disappearanceDate"</span>:    <span class="type">datetime</span>,
+    <span class="key">"emitterId"</span>:            <span class="type">int</span>,
+    <span class="key">"emittedAt"</span>:            <span class="type">datetime</span>,
+    <span class="key">"status"</span>:               <span class="type">0|1|2</span> <span class="cmt">(Active|Resolved|Cancelled)</span>
+  }
+]</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- GET /api/alerts/{id} -->
+  <div class="endpoint-card">
+    <div class="endpoint-header">
+      <span class="method GET">GET</span>
+      <code>/api/alerts/{id}</code>
+      <span class="endpoint-desc">Detalle de una alerta</span>
+    </div>
+    <div class="endpoint-body single">
+      <div>
+        <div class="endpoint-section-title">Path param</div>
+        <pre><code><span class="key">id</span>  <span class="type">string</span>  <span class="cmt">ObjectId de MongoDB</span></code></pre>
+        <div class="endpoint-section-title" style="margin-top:12px">Respuesta — data</div>
+        <pre><code><span class="cmt">AlertResponse</span>  <span class="cmt">(misma estructura que el ítem de la lista)</span>
+<span class="cmt">404 si la alerta no existe</span></code></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- GET /api/alerts/{id}/metrics -->
+  <div class="endpoint-card">
+    <div class="endpoint-header">
+      <span class="method GET">GET</span>
+      <code>/api/alerts/{id}/metrics</code>
+      <span class="endpoint-desc">Métricas de participación ciudadana (desde Cassandra)</span>
+    </div>
+    <div class="endpoint-body single">
+      <div>
+        <div class="endpoint-section-title">Respuesta — data</div>
+        <pre><code>{
+  <span class="key">"alertId"</span>:           <span class="type">string</span>,
+  <span class="key">"totalAwareness"</span>:    <span class="type">int</span>,     <span class="cmt">reportes tipo "Me enteré"</span>
+  <span class="key">"totalInfoReports"</span>:  <span class="type">int</span>,     <span class="cmt">reportes tipo "Tengo info"</span>
+  <span class="key">"geographicReachKm"</span>: <span class="type">double</span>  <span class="cmt">radio máximo desde última ubicación conocida</span>
+}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- GET /api/alerts/by-emitter/{emitterId} -->
+  <div class="endpoint-card">
+    <div class="endpoint-header">
+      <span class="method GET">GET</span>
+      <code>/api/alerts/by-emitter/{emitterId}</code>
+      <span class="endpoint-desc">Alertas de un emisor (ciudadano o entidad)</span>
+    </div>
+    <div class="endpoint-body">
+      <div>
+        <div class="endpoint-section-title">Path param</div>
+        <pre><code><span class="key">emitterId</span>  <span class="type">int</span>  <span class="cmt">1=ciudadano, 2=entidad</span></code></pre>
+        <div class="endpoint-section-title" style="margin-top:12px">Query params</div>
+        <pre><code><span class="key">page</span>     <span class="type">int</span>  <span class="cmt">default: 1</span>
+<span class="key">pageSize</span> <span class="type">int</span>  <span class="cmt">default: 20</span></code></pre>
+      </div>
+      <div>
+        <div class="endpoint-section-title">Respuesta — data</div>
+        <pre><code><span class="cmt">PagedResponse&lt;AlertResponse&gt;</span>
+<span class="cmt">(misma estructura que GET /api/alerts)</span></code></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- POST /api/alerts -->
+  <div class="endpoint-card">
+    <div class="endpoint-header">
+      <span class="method POST">POST</span>
+      <code>/api/alerts</code>
+      <span class="endpoint-desc">Crear nueva alerta — multipart/form-data</span>
+    </div>
+    <div class="endpoint-body">
+      <div>
+        <div class="endpoint-section-title">Request body (multipart/form-data)</div>
+        <pre><code><span class="key">firstName</span>            <span class="type">string</span>   <span class="cmt">requerido</span>
+<span class="key">lastName</span>             <span class="type">string</span>   <span class="cmt">requerido</span>
+<span class="key">age</span>                  <span class="type">int</span>      <span class="cmt">requerido</span>
+<span class="key">physicalDescription</span>  <span class="type">string</span>   <span class="cmt">requerido</span>
+<span class="key">situation</span>            <span class="type">string</span>   <span class="cmt">requerido</span>
+<span class="key">latitude</span>             <span class="type">double</span>   <span class="cmt">última ubicación conocida</span>
+<span class="key">longitude</span>            <span class="type">double</span>   <span class="cmt">última ubicación conocida</span>
+<span class="key">disappearanceDate</span>    <span class="type">datetime</span>
+<span class="key">emitterId</span>            <span class="type">int</span>      <span class="cmt">1 o 2</span>
+<span class="key">photo</span>                <span class="type">file?</span>    <span class="cmt">jpg/png, max 5 MB (opcional)</span></code></pre>
+      </div>
+      <div>
+        <div class="endpoint-section-title">Respuesta</div>
+        <pre><code><span class="cmt">201 Created</span>
+<span class="cmt">Location: /api/alerts/{newId}</span>
+
+<span class="cmt">data: AlertResponse con photoUrl</span>
+<span class="cmt">      si se subió foto → /photos/{uuid}.jpg</span></code></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- PATCH /api/alerts/{id}/status -->
+  <div class="endpoint-card">
+    <div class="endpoint-header">
+      <span class="method PATCH">PATCH</span>
+      <code>/api/alerts/{id}/status</code>
+      <span class="endpoint-desc">Cambiar estado de una alerta</span>
+    </div>
+    <div class="endpoint-body">
+      <div>
+        <div class="endpoint-section-title">Request body (application/json)</div>
+        <pre><code>{
+  <span class="key">"status"</span>: <span class="num">0</span>  <span class="cmt">0=Active  1=Resolved  2=Cancelled</span>
+}</code></pre>
+      </div>
+      <div>
+        <div class="endpoint-section-title">Respuesta — data</div>
+        <pre><code><span class="bool">true</span>   <span class="cmt">si se actualizó correctamente</span>
+<span class="cmt">404 si la alerta no existe</span></code></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ ENDPOINTS — REPORTES ═══ -->
+  <h2 id="reports">Reportes ciudadanos <code style="font-size:14px;color:var(--text-muted)">/api/reports</code></h2>
+
+  <!-- POST /api/reports/awareness -->
+  <div class="endpoint-card">
+    <div class="endpoint-header">
+      <span class="method POST">POST</span>
+      <code>/api/reports/awareness</code>
+      <span class="endpoint-desc">Registrar "Me enteré" — application/json</span>
+    </div>
+    <div class="endpoint-body">
+      <div>
+        <div class="endpoint-section-title">Request body</div>
+        <pre><code>{
+  <span class="key">"alertId"</span>:    <span class="type">string</span>,   <span class="cmt">requerido</span>
+  <span class="key">"latitude"</span>:   <span class="type">double</span>,
+  <span class="key">"longitude"</span>:  <span class="type">double</span>,
+  <span class="key">"reportedAt"</span>: <span class="type">datetime</span>  <span class="cmt">UTC ISO-8601</span>
+}</code></pre>
+      </div>
+      <div>
+        <div class="endpoint-section-title">Respuesta — data</div>
+        <pre><code>{
+  <span class="key">"id"</span>:          <span class="type">uuid</span>,
+  <span class="key">"alertId"</span>:     <span class="type">string</span>,
+  <span class="key">"type"</span>:        <span class="num">0</span>,       <span class="cmt">Awareness</span>
+  <span class="key">"latitude"</span>:    <span class="type">double</span>,
+  <span class="key">"longitude"</span>:   <span class="type">double</span>,
+  <span class="key">"reportedAt"</span>:  <span class="type">datetime</span>,
+  <span class="key">"description"</span>: <span class="null">null</span>,
+  <span class="key">"photoUrl"</span>:    <span class="null">null</span>
+}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- POST /api/reports/info -->
+  <div class="endpoint-card">
+    <div class="endpoint-header">
+      <span class="method POST">POST</span>
+      <code>/api/reports/info</code>
+      <span class="endpoint-desc">Registrar "Tengo información" — multipart/form-data</span>
+    </div>
+    <div class="endpoint-body">
+      <div>
+        <div class="endpoint-section-title">Request body (multipart/form-data)</div>
+        <pre><code><span class="key">alertId</span>     <span class="type">string</span>    <span class="cmt">requerido</span>
+<span class="key">latitude</span>    <span class="type">double</span>
+<span class="key">longitude</span>   <span class="type">double</span>
+<span class="key">description</span> <span class="type">string</span>    <span class="cmt">requerido</span>
+<span class="key">reportedAt</span>  <span class="type">datetime</span>  <span class="cmt">UTC ISO-8601</span>
+<span class="key">photo</span>       <span class="type">file?</span>     <span class="cmt">jpg/png, max 5 MB (opcional)</span></code></pre>
+      </div>
+      <div>
+        <div class="endpoint-section-title">Respuesta — data</div>
+        <pre><code>{
+  <span class="key">"id"</span>:          <span class="type">uuid</span>,
+  <span class="key">"alertId"</span>:     <span class="type">string</span>,
+  <span class="key">"type"</span>:        <span class="num">1</span>,       <span class="cmt">Info</span>
+  <span class="key">"latitude"</span>:    <span class="type">double</span>,
+  <span class="key">"longitude"</span>:   <span class="type">double</span>,
+  <span class="key">"reportedAt"</span>:  <span class="type">datetime</span>,
+  <span class="key">"description"</span>: <span class="type">string</span>,
+  <span class="key">"photoUrl"</span>:    <span class="type">string | null</span>
+}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- GET /api/reports/by-alert/{alertId} -->
+  <div class="endpoint-card">
+    <div class="endpoint-header">
+      <span class="method GET">GET</span>
+      <code>/api/reports/by-alert/{alertId}</code>
+      <span class="endpoint-desc">Reportes paginados de una alerta (desde Cassandra)</span>
+    </div>
+    <div class="endpoint-body">
+      <div>
+        <div class="endpoint-section-title">Path + Query params</div>
+        <pre><code><span class="key">alertId</span>   <span class="type">string</span>  <span class="cmt">path</span>
+<span class="key">page</span>      <span class="type">int</span>     <span class="cmt">default: 1</span>
+<span class="key">pageSize</span>  <span class="type">int</span>     <span class="cmt">default: 50  (max: 100)</span></code></pre>
+      </div>
+      <div>
+        <div class="endpoint-section-title">Respuesta — data</div>
+        <pre><code><span class="cmt">PagedResponse&lt;CitizenReport&gt;</span>
+<span class="cmt">(ítems con estructura CitizenReport)</span></code></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ ENDPOINTS — ESTADÍSTICAS ═══ -->
+  <h2 id="stats">Estadísticas <code style="font-size:14px;color:var(--text-muted)">/api/stats</code></h2>
+
+  <!-- GET /api/stats/overview -->
+  <div class="endpoint-card">
+    <div class="endpoint-header">
+      <span class="method GET">GET</span>
+      <code>/api/stats/overview</code>
+      <span class="endpoint-desc">Resumen global del sistema</span>
+    </div>
+    <div class="endpoint-body single">
+      <div>
+        <div class="endpoint-section-title">Respuesta — data</div>
+        <pre><code>{
+  <span class="key">"totalAlerts"</span>:           <span class="type">int</span>,
+  <span class="key">"activeAlerts"</span>:          <span class="type">int</span>,
+  <span class="key">"resolvedAlerts"</span>:        <span class="type">int</span>,
+  <span class="key">"cancelledAlerts"</span>:       <span class="type">int</span>,
+  <span class="key">"totalReports"</span>:          <span class="type">long</span>,
+  <span class="key">"totalAwarenessReports"</span>: <span class="type">long</span>,
+  <span class="key">"totalInfoReports"</span>:      <span class="type">long</span>
+}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- GET /api/stats/heatmap -->
+  <div class="endpoint-card">
+    <div class="endpoint-header">
+      <span class="method GET">GET</span>
+      <code>/api/stats/heatmap</code>
+      <span class="endpoint-desc">Celdas del mapa de calor (pre-agregadas en MongoDB)</span>
+    </div>
+    <div class="endpoint-body">
+      <div>
+        <div class="endpoint-section-title">Query param</div>
+        <pre><code><span class="key">alertId</span>  <span class="type">string?</span>  <span class="cmt">opcional — filtra por alerta
+                   si se omite devuelve celdas globales</span></code></pre>
+      </div>
+      <div>
+        <div class="endpoint-section-title">Respuesta — data</div>
+        <pre><code>{
+  <span class="key">"alertId"</span>: <span class="type">string | null</span>,
+  <span class="key">"cells"</span>: [
+    {
+      <span class="key">"centerLatitude"</span>:   <span class="type">double</span>,
+      <span class="key">"centerLongitude"</span>:  <span class="type">double</span>,
+      <span class="key">"awarenessCount"</span>:   <span class="type">int</span>,
+      <span class="key">"infoCount"</span>:        <span class="type">int</span>,
+      <span class="key">"weightedIntensity"</span>:<span class="type">double</span>, <span class="cmt">infoCount×3 + awarenessCount×1</span>
+      <span class="key">"lastUpdated"</span>:      <span class="type">datetime</span>
+    }
+  ]
+}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ ENDPOINTS — NOTIFICACIONES ═══ -->
+  <h2 id="notifications">Notificaciones <code style="font-size:14px;color:var(--text-muted)">/api/notifications</code></h2>
+
+  <!-- POST /api/notifications/register-token -->
+  <div class="endpoint-card">
+    <div class="endpoint-header">
+      <span class="method POST">POST</span>
+      <code>/api/notifications/register-token</code>
+      <span class="endpoint-desc">Registrar token FCM del dispositivo</span>
+    </div>
+    <div class="endpoint-body">
+      <div>
+        <div class="endpoint-section-title">Request body (application/json)</div>
+        <pre><code>{
+  <span class="key">"token"</span>: <span class="type">string</span>,  <span class="cmt">token FCM del dispositivo</span>
+  <span class="key">"role"</span>:  <span class="type">string</span>   <span class="cmt">"citizen" | "entity"</span>
+}</code></pre>
+      </div>
+      <div>
+        <div class="endpoint-section-title">Respuesta — data</div>
+        <pre><code><span class="bool">true</span>
+<span class="cmt">MVP: el token se registra en log.
+En producción: persistir y usar con FCM.</span></code></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════
+       BASES DE DATOS
+  ═══════════════════════════════════════ -->
+
+  <h2 id="mongodb">Estructuras en MongoDB</h2>
+  <p>Motor de lectura/consultas. EF Core con driver oficial <code>MongoDB.EntityFrameworkCore 10.0.1</code>. Base de datos: <code>safesight</code>.</p>
+
+  <!-- Collection: alerts -->
+  <div class="db-card">
+    <div class="db-header">
+      <span class="db-name">alerts</span>
+      <span class="db-tag">Colección MongoDB</span>
+    </div>
+    <div class="db-body">
+      <table>
+        <thead>
+          <tr>
+            <th>Campo</th>
+            <th>Tipo BSON</th>
+            <th>Clave</th>
+            <th>Descripción</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="col-name">_id</td>
+            <td class="col-type">String</td>
+            <td class="col-key"><span class="pk-badge pk">PK</span></td>
+            <td class="col-desc">ObjectId como string generado por la API</td>
+          </tr>
+          <tr>
+            <td class="col-name">MissingPerson.FirstName</td>
+            <td class="col-type">String</td>
+            <td></td>
+            <td class="col-desc">Nombre de la persona buscada</td>
+          </tr>
+          <tr>
+            <td class="col-name">MissingPerson.LastName</td>
+            <td class="col-type">String</td>
+            <td></td>
+            <td class="col-desc">Apellido</td>
+          </tr>
+          <tr>
+            <td class="col-name">MissingPerson.Age</td>
+            <td class="col-type">Int32</td>
+            <td></td>
+            <td class="col-desc">Edad al momento de la desaparición</td>
+          </tr>
+          <tr>
+            <td class="col-name">MissingPerson.PhysicalDescription</td>
+            <td class="col-type">String</td>
+            <td></td>
+            <td class="col-desc">Descripción física (ropa, rasgos, etc.)</td>
+          </tr>
+          <tr>
+            <td class="col-name">MissingPerson.PhotoUrl</td>
+            <td class="col-type">String</td>
+            <td></td>
+            <td class="col-desc">Ruta relativa: <code>/photos/{uuid}.jpg</code></td>
+          </tr>
+          <tr>
+            <td class="col-name">Situation</td>
+            <td class="col-type">String</td>
+            <td></td>
+            <td class="col-desc">Texto libre con la situación de la desaparición</td>
+          </tr>
+          <tr>
+            <td class="col-name">LastKnownLocation.Latitude</td>
+            <td class="col-type">Double</td>
+            <td></td>
+            <td class="col-desc">Latitud de la última ubicación conocida</td>
+          </tr>
+          <tr>
+            <td class="col-name">LastKnownLocation.Longitude</td>
+            <td class="col-type">Double</td>
+            <td></td>
+            <td class="col-desc">Longitud de la última ubicación conocida</td>
+          </tr>
+          <tr>
+            <td class="col-name">DisappearanceDate</td>
+            <td class="col-type">DateTime</td>
+            <td></td>
+            <td class="col-desc">Fecha y hora de la desaparición (UTC)</td>
+          </tr>
+          <tr>
+            <td class="col-name">EmitterId</td>
+            <td class="col-type">Int32</td>
+            <td><span class="pk-badge idx">IDX</span></td>
+            <td class="col-desc">1 = ciudadano · 2 = entidad (policial, etc.)</td>
+          </tr>
+          <tr>
+            <td class="col-name">EmittedAt</td>
+            <td class="col-type">DateTime</td>
+            <td></td>
+            <td class="col-desc">Timestamp de creación de la alerta (UTC)</td>
+          </tr>
+          <tr>
+            <td class="col-name">Status</td>
+            <td class="col-type">Int32</td>
+            <td><span class="pk-badge idx">IDX</span></td>
+            <td class="col-desc">0=Active · 1=Resolved · 2=Cancelled</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="db-note">
+      <strong>Documento embebido:</strong> <code>MissingPerson</code> y <code>LastKnownLocation</code> son subdocumentos embebidos (no colecciones separadas). EF Core los mapea con <code>OwnsOne()</code>.
+    </div>
+  </div>
+
+  <!-- Documento de ejemplo: alert -->
+  <h4>Documento de ejemplo — alerts</h4>
+  <pre><code>{
+  <span class="key">"_id"</span>: <span class="str">"6650a1b2c3d4e5f6a7b8c9d0"</span>,
+  <span class="key">"MissingPerson"</span>: {
+    <span class="key">"FirstName"</span>:            <span class="str">"María"</span>,
+    <span class="key">"LastName"</span>:             <span class="str">"González"</span>,
+    <span class="key">"Age"</span>:                  <span class="num">34</span>,
+    <span class="key">"PhysicalDescription"</span>:  <span class="str">"1.65 m, cabello negro largo, ojos marrones"</span>,
+    <span class="key">"PhotoUrl"</span>:             <span class="str">"/photos/f3a8b2c1-4d5e-6f7a-8b9c-0d1e2f3a4b5c.jpg"</span>
+  },
+  <span class="key">"Situation"</span>:            <span class="str">"Fue vista por última vez en el Parque Rivadavia a las 18:00 hs."</span>,
+  <span class="key">"LastKnownLocation"</span>: {
+    <span class="key">"Latitude"</span>:   <span class="num">-34.6180</span>,
+    <span class="key">"Longitude"</span>:  <span class="num">-58.4346</span>
+  },
+  <span class="key">"DisappearanceDate"</span>:    <span class="str">"2026-05-20T18:00:00Z"</span>,
+  <span class="key">"EmitterId"</span>:            <span class="num">1</span>,
+  <span class="key">"EmittedAt"</span>:            <span class="str">"2026-05-20T20:15:00Z"</span>,
+  <span class="key">"Status"</span>:               <span class="num">0</span>
+}</code></pre>
+
+  <!-- Collection: heatmap_cells -->
+  <div class="db-card" style="margin-top:32px">
+    <div class="db-header">
+      <span class="db-name">heatmap_cells</span>
+      <span class="db-tag">Colección MongoDB — pre-agregada por HeatmapSyncService</span>
+    </div>
+    <div class="db-body">
+      <table>
+        <thead>
+          <tr>
+            <th>Campo</th>
+            <th>Tipo BSON</th>
+            <th>Clave</th>
+            <th>Descripción</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="col-name">_id</td>
+            <td class="col-type">String</td>
+            <td class="col-key"><span class="pk-badge pk">PK</span></td>
+            <td class="col-desc">Formato: <code>"alertId|-34.60:-58.38"</code> o <code>"global|-34.60:-58.38"</code></td>
+          </tr>
+          <tr>
+            <td class="col-name">AlertId</td>
+            <td class="col-type">String?</td>
+            <td></td>
+            <td class="col-desc"><code>null</code> para celdas globales (todas las alertas)</td>
+          </tr>
+          <tr>
+            <td class="col-name">CenterLatitude</td>
+            <td class="col-type">Double</td>
+            <td></td>
+            <td class="col-desc">Latitud del centro de la celda (2 decimales ≈ 1 km²)</td>
+          </tr>
+          <tr>
+            <td class="col-name">CenterLongitude</td>
+            <td class="col-type">Double</td>
+            <td></td>
+            <td class="col-desc">Longitud del centro de la celda</td>
+          </tr>
+          <tr>
+            <td class="col-name">AwarenessCount</td>
+            <td class="col-type">Int32</td>
+            <td></td>
+            <td class="col-desc">Cantidad acumulada de reportes tipo "Me enteré"</td>
+          </tr>
+          <tr>
+            <td class="col-name">InfoCount</td>
+            <td class="col-type">Int32</td>
+            <td></td>
+            <td class="col-desc">Cantidad acumulada de reportes tipo "Tengo info"</td>
+          </tr>
+          <tr>
+            <td class="col-name">WeightedIntensity</td>
+            <td class="col-type">Double</td>
+            <td></td>
+            <td class="col-desc"><code>InfoCount × 3 + AwarenessCount × 1</code></td>
+          </tr>
+          <tr>
+            <td class="col-name">LastUpdated</td>
+            <td class="col-type">DateTime</td>
+            <td></td>
+            <td class="col-desc">Última vez que el sync actualizó esta celda</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="db-note">
+      <strong>Geohash personalizado:</strong> se redondean lat/lng a 2 decimales → clave <code>"lat:lng"</code>. Una celda cubre aproximadamente 1 km² en latitudes medias. Las celdas se crean y actualizan incrementalmente cada 15 segundos.
+    </div>
+  </div>
+
+  <h4>Documento de ejemplo — heatmap_cells</h4>
+  <pre><code>{
+  <span class="key">"_id"</span>:               <span class="str">"6650a1b2c3d4e5f6a7b8c9d0|-34.62:-58.43"</span>,
+  <span class="key">"AlertId"</span>:           <span class="str">"6650a1b2c3d4e5f6a7b8c9d0"</span>,
+  <span class="key">"CenterLatitude"</span>:    <span class="num">-34.62</span>,
+  <span class="key">"CenterLongitude"</span>:   <span class="num">-58.43</span>,
+  <span class="key">"AwarenessCount"</span>:    <span class="num">47</span>,
+  <span class="key">"InfoCount"</span>:         <span class="num">12</span>,
+  <span class="key">"WeightedIntensity"</span>: <span class="num">83.0</span>,   <span class="cmt">12×3 + 47×1</span>
+  <span class="key">"LastUpdated"</span>:       <span class="str">"2026-05-27T03:00:15Z"</span>
+}</code></pre>
+
+  <!-- ═══════════════════════════════════════
+       CASSANDRA
+  ═══════════════════════════════════════ -->
+
+  <h2 id="cassandra">Estructuras en Cassandra</h2>
+  <p>Motor de escritura/ingesta. Driver nativo <code>CassandraCSharpDriver 3.22</code>. Keyspace: <code>safesight</code>. Replication: SimpleStrategy (factor 1 para dev; ajustar a NetworkTopologyStrategy en producción).</p>
+
+  <!-- tabla: citizen_reports -->
+  <div class="db-card">
+    <div class="db-header">
+      <span class="db-name">citizen_reports</span>
+      <span class="db-tag">Tabla Cassandra — particionada por alerta + día</span>
+    </div>
+    <div class="db-body">
+      <table>
+        <thead>
+          <tr>
+            <th>Columna</th>
+            <th>Tipo CQL</th>
+            <th>Clave</th>
+            <th>Descripción</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="col-name">alert_id</td>
+            <td class="col-type">TEXT</td>
+            <td class="col-key"><span class="pk-badge pk">PK</span></td>
+            <td class="col-desc">ObjectId de la alerta en MongoDB</td>
+          </tr>
+          <tr>
+            <td class="col-name">time_bucket</td>
+            <td class="col-type">TEXT</td>
+            <td class="col-key"><span class="pk-badge pk">PK</span></td>
+            <td class="col-desc">Fecha UTC como "YYYY-MM-DD". Evita hot partitions en alertas con muchos reportes</td>
+          </tr>
+          <tr>
+            <td class="col-name">reported_at</td>
+            <td class="col-type">TIMESTAMP</td>
+            <td class="col-key"><span class="pk-badge ck">CK</span></td>
+            <td class="col-desc">Clustering key ASC — permite range queries por tiempo</td>
+          </tr>
+          <tr>
+            <td class="col-name">id</td>
+            <td class="col-type">UUID</td>
+            <td class="col-key"><span class="pk-badge ck">CK</span></td>
+            <td class="col-desc">Clustering key ASC — garantiza unicidad de fila</td>
+          </tr>
+          <tr>
+            <td class="col-name">type</td>
+            <td class="col-type">INT</td>
+            <td></td>
+            <td class="col-desc">0 = Awareness · 1 = Info</td>
+          </tr>
+          <tr>
+            <td class="col-name">latitude</td>
+            <td class="col-type">DOUBLE</td>
+            <td></td>
+            <td class="col-desc">Coordenada del ciudadano al reportar</td>
+          </tr>
+          <tr>
+            <td class="col-name">longitude</td>
+            <td class="col-type">DOUBLE</td>
+            <td></td>
+            <td class="col-desc">Coordenada del ciudadano al reportar</td>
+          </tr>
+          <tr>
+            <td class="col-name">description</td>
+            <td class="col-type">TEXT</td>
+            <td></td>
+            <td class="col-desc">Texto del reporte (solo reportes Info; null en Awareness)</td>
+          </tr>
+          <tr>
+            <td class="col-name">photo_url</td>
+            <td class="col-type">TEXT</td>
+            <td></td>
+            <td class="col-desc">Ruta de foto adjunta (opcional, solo Info)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="db-note">
+      <strong>PRIMARY KEY:</strong> <code>((alert_id, time_bucket), reported_at, id)</code> — CLUSTERING ORDER BY <code>reported_at ASC, id ASC</code><br/>
+      <strong>Uso:</strong> lectura de reportes de una alerta desde el cliente Android vía <code>GET /api/reports/by-alert/{alertId}</code>.
+    </div>
+  </div>
+
+  <!-- tabla: citizen_reports_by_time -->
+  <div class="db-card">
+    <div class="db-header">
+      <span class="db-name">citizen_reports_by_time</span>
+      <span class="db-tag">Tabla Cassandra — tabla secundaria para el HeatmapSyncService</span>
+    </div>
+    <div class="db-body">
+      <table>
+        <thead>
+          <tr>
+            <th>Columna</th>
+            <th>Tipo CQL</th>
+            <th>Clave</th>
+            <th>Descripción</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="col-name">time_bucket</td>
+            <td class="col-type">TEXT</td>
+            <td class="col-key"><span class="pk-badge pk">PK</span></td>
+            <td class="col-desc">Fecha UTC "YYYY-MM-DD" — permite escanear todos los reportes de un día sin conocer alert_id</td>
+          </tr>
+          <tr>
+            <td class="col-name">reported_at</td>
+            <td class="col-type">TIMESTAMP</td>
+            <td class="col-key"><span class="pk-badge ck">CK</span></td>
+            <td class="col-desc">Clustering key ASC — el sync consulta <code>WHERE time_bucket = ? AND reported_at &gt; ?</code></td>
+          </tr>
+          <tr>
+            <td class="col-name">id</td>
+            <td class="col-type">UUID</td>
+            <td class="col-key"><span class="pk-badge ck">CK</span></td>
+            <td class="col-desc">Unicidad de fila</td>
+          </tr>
+          <tr>
+            <td class="col-name">alert_id</td>
+            <td class="col-type">TEXT</td>
+            <td></td>
+            <td class="col-desc">Referencia a la alerta (para generar celdas por alerta)</td>
+          </tr>
+          <tr>
+            <td class="col-name">type</td>
+            <td class="col-type">INT</td>
+            <td></td>
+            <td class="col-desc">0 = Awareness · 1 = Info</td>
+          </tr>
+          <tr>
+            <td class="col-name">latitude</td>
+            <td class="col-type">DOUBLE</td>
+            <td></td>
+            <td class="col-desc">Coordenada para calcular geohash</td>
+          </tr>
+          <tr>
+            <td class="col-name">longitude</td>
+            <td class="col-type">DOUBLE</td>
+            <td></td>
+            <td class="col-desc">Coordenada para calcular geohash</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="db-note">
+      <strong>PRIMARY KEY:</strong> <code>(time_bucket, reported_at, id)</code> — CLUSTERING ORDER BY <code>reported_at ASC, id ASC</code><br/>
+      <strong>Diseño:</strong> denormalización deliberada (dual-write). Cada reporte se escribe simultáneamente en <code>citizen_reports</code> y en esta tabla. Solo la usa el <code>HeatmapSyncService</code>; el cliente Android no consume esta tabla directamente.
+    </div>
+  </div>
+
+  <!-- tabla: sync_checkpoints -->
+  <div class="db-card">
+    <div class="db-header">
+      <span class="db-name">sync_checkpoints</span>
+      <span class="db-tag">Tabla Cassandra — estado interno del HeatmapSyncService</span>
+    </div>
+    <div class="db-body">
+      <table>
+        <thead>
+          <tr>
+            <th>Columna</th>
+            <th>Tipo CQL</th>
+            <th>Clave</th>
+            <th>Descripción</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="col-name">service_name</td>
+            <td class="col-type">TEXT</td>
+            <td class="col-key"><span class="pk-badge pk">PK</span></td>
+            <td class="col-desc">Identificador del servicio. Valor actual: <code>"HeatmapSyncService"</code></td>
+          </tr>
+          <tr>
+            <td class="col-name">last_processed_at</td>
+            <td class="col-type">TIMESTAMP</td>
+            <td></td>
+            <td class="col-desc">Último <code>reported_at</code> procesado. El sync lee reportes con <code>reported_at &gt; last_processed_at</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="db-note">
+      <strong>PRIMARY KEY:</strong> <code>(service_name)</code> — tabla simple de un solo registro por servicio. Se actualiza cada vez que el sync termina un ciclo.
+    </div>
+  </div>
+
+  <!-- ═══ FLUJO DE DATOS ═══ -->
+  <h2 id="flow">Flujo de datos</h2>
+
+  <h3>Escritura de un reporte ciudadano</h3>
+  <div class="flow-box">
+<span class="flow-node">Android App</span>
+  <span class="flow-arrow">──POST /api/reports/awareness──▶</span>  <span class="flow-node">ReportsController</span>
+                                        <span class="flow-arrow">──▶</span>  <span class="flow-node">ReportsService</span>
+                                              <span class="flow-arrow">──▶</span>  <span class="flow-store">Cassandra: citizen_reports</span>         <span class="cmt">(dual-write)</span>
+                                              <span class="flow-arrow">──▶</span>  <span class="flow-store">Cassandra: citizen_reports_by_time</span>  <span class="cmt">(dual-write)</span>
+  </div>
+
+  <h3>Sincronización al mapa de calor (background, cada 15 s)</h3>
+  <div class="flow-box">
+<span class="flow-node">HeatmapSyncService</span>
+  <span class="flow-arrow">──▶</span>  <span class="flow-store">Cassandra: citizen_reports_by_time</span>
+          WHERE time_bucket = <span class="str">'YYYY-MM-DD'</span> AND reported_at &gt; last_checkpoint
+  <span class="flow-arrow">──▶</span>  agrupa por geohash (<span class="str">"lat:lng"</span>)
+  <span class="flow-arrow">──▶</span>  upsert  <span class="flow-store">MongoDB: heatmap_cells</span>
+  <span class="flow-arrow">──▶</span>  UPDATE  <span class="flow-store">Cassandra: sync_checkpoints</span>
+  </div>
+
+  <h3>Lectura del mapa de calor por el cliente</h3>
+  <div class="flow-box">
+<span class="flow-node">Android App</span>
+  <span class="flow-arrow">──GET /api/stats/heatmap?alertId=X──▶</span>  <span class="flow-node">StatsController</span>
+                                            <span class="flow-arrow">──▶</span>  <span class="flow-store">MongoDB: heatmap_cells</span>
+                                            <span class="flow-arrow">◀──</span>  lista de HeatmapCellDto
+  </div>
+
+  <hr class="divider" />
+  <p style="text-align:center; font-size:12px;">SafeSight API · .NET 10 · Ingeniería de Datos · 2026</p>
+
+</main>
+</body>
+</html>
