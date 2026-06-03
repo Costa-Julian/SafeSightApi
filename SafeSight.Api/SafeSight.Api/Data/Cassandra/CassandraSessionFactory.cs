@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using SafeSight.Api.Models.Configuration;
 
 namespace SafeSight.Api.Data.Cassandra;
@@ -38,6 +38,11 @@ public class CassandraSessionFactory : IDisposable
             }
 
             clusterBuilder.WithPort(_settings.Port);
+
+            if (!string.IsNullOrWhiteSpace(_settings.LocalDatacenter))
+            {
+                clusterBuilder.WithLoadBalancingPolicy(new global::Cassandra.DCAwareRoundRobinPolicy(_settings.LocalDatacenter));
+            }
 
             if (!string.IsNullOrWhiteSpace(_settings.Username))
             {

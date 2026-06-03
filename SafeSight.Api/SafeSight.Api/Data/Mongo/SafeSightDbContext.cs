@@ -6,7 +6,11 @@ namespace SafeSight.Api.Data.Mongo;
 
 public class SafeSightDbContext : DbContext
 {
-    public SafeSightDbContext(DbContextOptions<SafeSightDbContext> options) : base(options) { }
+    public SafeSightDbContext(DbContextOptions<SafeSightDbContext> options) : base(options)
+    {
+        // MongoDB standalone (sin replica set) no soporta transacciones
+        Database.AutoTransactionBehavior = Microsoft.EntityFrameworkCore.AutoTransactionBehavior.Never;
+    }
 
     public DbSet<Alert> Alerts => Set<Alert>();
     public DbSet<HeatmapCell> HeatmapCells => Set<HeatmapCell>();

@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SafeSight API — Documentación</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #222536;
+      --border: #2e3147;
+      --text: #e2e8f0;
+      --muted: #8892a4;
+      --accent: #6366f1;
+      --get: #22c55e;
+      --post: #3b82f6;
+      --patch: #f59e0b;
+      --delete: #ef4444;
+      --get-bg: rgba(34,197,94,0.12);
+      --post-bg: rgba(59,130,246,0.12);
+      --patch-bg: rgba(245,158,11,0.12);
+      --delete-bg: rgba(239,68,68,0.12);
+      --radius: 8px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── Layout ── */
+    .layout { display: flex; min-height: 100vh; }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: 260px;
+      min-width: 260px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 24px 0;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+    }
+    .sidebar-logo {
+      padding: 0 20px 24px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 16px;
+    }
+    .sidebar-logo h1 { font-size: 18px; font-weight: 700; color: var(--text); }
+    .sidebar-logo span { font-size: 12px; color: var(--muted); }
+    .sidebar-section { padding: 8px 20px 4px; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+    .sidebar-link {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 20px;
+      font-size: 13.5px;
+      color: var(--muted);
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .sidebar-link:hover { background: var(--surface2); color: var(--text); }
+    .sidebar-link .badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 4px;
+      letter-spacing: 0.03em;
+    }
+    .badge-get { background: var(--get-bg); color: var(--get); }
+    .badge-post { background: var(--post-bg); color: var(--post); }
+    .badge-patch { background: var(--patch-bg); color: var(--patch); }
+
+    /* ── Main ── */
+    .main { flex: 1; padding: 48px; max-width: 900px; }
+
+    /* ── Hero ── */
+    .hero { margin-bottom: 48px; }
+    .hero h2 { font-size: 28px; font-weight: 700; margin-bottom: 10px; }
+    .hero p { color: var(--muted); max-width: 620px; line-height: 1.7; }
+    .hero-meta {
+      display: flex;
+      gap: 24px;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+    .hero-meta-item { display: flex; flex-direction: column; gap: 2px; }
+    .hero-meta-item span:first-child { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+    .hero-meta-item span:last-child { font-size: 14px; font-weight: 500; }
+    .base-url {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 16px;
+      font-family: 'Consolas', 'Cascadia Code', monospace;
+      font-size: 14px;
+      margin-top: 20px;
+    }
+    .base-url-label { font-size: 11px; color: var(--muted); font-family: sans-serif; }
+
+    /* ── Section ── */
+    .section { margin-bottom: 56px; }
+    .section-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .section-desc { color: var(--muted); font-size: 14px; margin-bottom: 24px; margin-top: 8px; }
+
+    /* ── Endpoint card ── */
+    .endpoint {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 20px;
+      overflow: hidden;
+    }
+    .endpoint-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 16px 20px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .endpoint-header:hover { background: var(--surface2); }
+    .method {
+      font-size: 11px;
+      font-weight: 800;
+      padding: 3px 10px;
+      border-radius: 5px;
+      min-width: 54px;
+      text-align: center;
+      letter-spacing: 0.04em;
+    }
+    .method-get { background: var(--get-bg); color: var(--get); }
+    .method-post { background: var(--post-bg); color: var(--post); }
+    .method-patch { background: var(--patch-bg); color: var(--patch); }
+    .endpoint-path {
+      font-family: 'Consolas', 'Cascadia Code', monospace;
+      font-size: 14px;
+      flex: 1;
+    }
+    .endpoint-path .param { color: #a78bfa; }
+    .endpoint-name { color: var(--muted); font-size: 13px; }
+    .chevron { margin-left: auto; color: var(--muted); font-size: 12px; transition: transform 0.2s; }
+
+    .endpoint-body { padding: 0 20px 20px; display: none; }
+    .endpoint.open .endpoint-body { display: block; }
+    .endpoint.open .chevron { transform: rotate(180deg); }
+
+    .endpoint-desc { color: var(--muted); font-size: 14px; margin-bottom: 20px; line-height: 1.7; }
+
+    /* ── Tables ── */
+    .table-label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; margin-top: 20px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+    th { background: var(--surface2); color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+    td { padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    .required { color: #f87171; font-size: 11px; font-weight: 600; margin-left: 4px; }
+    .optional { color: var(--muted); font-size: 11px; margin-left: 4px; }
+    code { font-family: 'Consolas', 'Cascadia Code', monospace; background: var(--surface2); padding: 1px 6px; border-radius: 4px; font-size: 13px; }
+
+    /* ── Code blocks ── */
+    .code-block {
+      background: #0d0f1a;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      font-family: 'Consolas', 'Cascadia Code', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      overflow-x: auto;
+      margin-top: 8px;
+      white-space: pre;
+    }
+    .code-block .key { color: #93c5fd; }
+    .code-block .str { color: #86efac; }
+    .code-block .num { color: #fcd34d; }
+    .code-block .comment { color: #4b5563; }
+    .code-block .bool { color: #f9a8d4; }
+
+    /* ── Response badges ── */
+    .responses { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+    .response-item { display: flex; align-items: flex-start; gap: 12px; }
+    .status-code { font-family: monospace; font-size: 13px; font-weight: 700; min-width: 36px; }
+    .status-200 { color: var(--get); }
+    .status-201 { color: #34d399; }
+    .status-404 { color: var(--patch); }
+    .status-400 { color: var(--delete); }
+    .response-desc { font-size: 13.5px; color: var(--muted); }
+
+    /* ── Divider ── */
+    hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+
+    /* ── Note ── */
+    .note {
+      display: flex;
+      gap: 10px;
+      background: rgba(99,102,241,0.1);
+      border: 1px solid rgba(99,102,241,0.25);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      font-size: 13.5px;
+      color: #a5b4fc;
+      margin-top: 16px;
+    }
+    .note-icon { flex-shrink: 0; margin-top: 1px; }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-logo">
+      <h1>SafeSight API</h1>
+      <span>v1.0 — .NET 10</span>
+    </div>
+
+    <div class="sidebar-section">Alerts</div>
+    <div class="sidebar-link" onclick="openAndScroll('get-alerts')"><span class="badge badge-get">GET</span> Listar alertas</div>
+    <div class="sidebar-link" onclick="openAndScroll('get-alert-id')"><span class="badge badge-get">GET</span> Alerta por ID</div>
+    <div class="sidebar-link" onclick="openAndScroll('get-alert-metrics')"><span class="badge badge-get">GET</span> Métricas</div>
+    <div class="sidebar-link" onclick="openAndScroll('get-alerts-emitter')"><span class="badge badge-get">GET</span> Por emisor</div>
+    <div class="sidebar-link" onclick="openAndScroll('post-alert')"><span class="badge badge-post">POST</span> Crear alerta</div>
+    <div class="sidebar-link" onclick="openAndScroll('patch-alert-status')"><span class="badge badge-patch">PATCH</span> Actualizar estado</div>
+
+    <div class="sidebar-section">Reports</div>
+    <div class="sidebar-link" onclick="openAndScroll('post-awareness')"><span class="badge badge-post">POST</span> Reporte awareness</div>
+    <div class="sidebar-link" onclick="openAndScroll('post-info')"><span class="badge badge-post">POST</span> Reporte info</div>
+    <div class="sidebar-link" onclick="openAndScroll('get-reports')"><span class="badge badge-get">GET</span> Por alerta</div>
+
+    <div class="sidebar-section">Stats</div>
+    <div class="sidebar-link" onclick="openAndScroll('get-overview')"><span class="badge badge-get">GET</span> Overview</div>
+    <div class="sidebar-link" onclick="openAndScroll('get-heatmap')"><span class="badge badge-get">GET</span> Heatmap</div>
+
+    <div class="sidebar-section">Notifications</div>
+    <div class="sidebar-link" onclick="openAndScroll('post-token')"><span class="badge badge-post">POST</span> Registrar token FCM</div>
+  </nav>
+
+  <!-- Main content -->
+  <main class="main">
+
+    <!-- Hero -->
+    <div class="hero">
+      <h2>SafeSight API</h2>
+      <p>
+        Sistema backend para la gestión de alertas de personas desaparecidas. Arquitectura dual NoSQL:
+        <strong>MongoDB</strong> para alertas (documentos flexibles) y <strong>Cassandra</strong> para reportes ciudadanos
+        (alta frecuencia de escritura). Sincronización continua mediante un <code>BackgroundService</code> que
+        genera el heatmap geográfico cada 15 segundos.
+      </p>
+      <div class="hero-meta">
+        <div class="hero-meta-item">
+          <span>Stack</span>
+          <span>.NET 10 / ASP.NET Core</span>
+        </div>
+        <div class="hero-meta-item">
+          <span>Bases de datos</span>
+          <span>MongoDB + Cassandra</span>
+        </div>
+        <div class="hero-meta-item">
+          <span>Documentación</span>
+          <span>Swagger en <code>/swagger</code></span>
+        </div>
+      </div>
+      <div class="base-url">
+        <span class="base-url-label">BASE URL</span>
+        http://localhost:5121
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════ ALERTS ═══ -->
+    <div class="section">
+      <div class="section-title">Alerts</div>
+      <div class="section-desc">
+        Gestión de alertas de personas desaparecidas. Los datos se persisten en <strong>MongoDB</strong>.
+        Cada alerta contiene información de la persona, ubicación del último avistamiento, estado y el tipo de emisor.
+      </div>
+
+      <!-- GET /api/alerts -->
+      <div class="endpoint" id="get-alerts">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method method-get">GET</span>
+          <span class="endpoint-path">/api/alerts</span>
+          <span class="endpoint-name">Listar alertas activas</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <p class="endpoint-desc">
+            Retorna una lista paginada de todas las alertas registradas en el sistema.
+            Útil para poblar pantallas de inicio o listados de búsqueda.
+          </p>
+
+          <div class="table-label">Query Parameters</div>
+          <table>
+            <thead><tr><th>Parámetro</th><th>Tipo</th><th>Default</th><th>Descripción</th></tr></thead>
+            <tbody>
+              <tr><td><code>page</code><span class="optional">opcional</span></td><td>integer</td><td>1</td><td>Número de página a retornar.</td></tr>
+              <tr><td><code>pageSize</code><span class="optional">opcional</span></td><td>integer</td><td>20</td><td>Cantidad de ítems por página. Máximo: 100.</td></tr>
+            </tbody>
+          </table>
+
+          <div class="table-label">Respuesta — 200 OK</div>
+          <div class="code-block"><span class="comment">// ApiResult&lt;PagedResponse&lt;AlertResponse&gt;&gt;</span>
+{
+  <span class="key">"success"</span>: <span class="bool">true</span>,
+  <span class="key">"data"</span>: {
+    <span class="key">"items"</span>: [
+      {
+        <span class="key">"id"</span>: <span class="str">"683b2f..."</span>,
+        <span class="key">"firstName"</span>: <span class="str">"Juan"</span>,
+        <span class="key">"lastName"</span>: <span class="str">"Pérez"</span>,
+        <span class="key">"age"</span>: <span class="num">35</span>,
+        <span class="key">"physicalDescription"</span>: <span class="str">"Hombre 1.75m, cabello castaño..."</span>,
+        <span class="key">"photoUrl"</span>: <span class="str">""</span>,
+        <span class="key">"situation"</span>: <span class="str">"Visto por última vez en el centro..."</span>,
+        <span class="key">"lastKnownLatitude"</span>: <span class="num">-34.6037</span>,
+        <span class="key">"lastKnownLongitude"</span>: <span class="num">-58.3816</span>,
+        <span class="key">"disappearanceDate"</span>: <span class="str">"2026-05-26T08:00:00"</span>,
+        <span class="key">"emitterId"</span>: <span class="num">1</span>,
+        <span class="key">"emittedAt"</span>: <span class="str">"2026-05-28T10:00:00"</span>,
+        <span class="key">"status"</span>: <span class="num">0</span>
+      }
+    ],
+    <span class="key">"page"</span>: <span class="num">1</span>,
+    <span class="key">"pageSize"</span>: <span class="num">20</span>,
+    <span class="key">"totalItems"</span>: <span class="num">42</span>,
+    <span class="key">"totalPages"</span>: <span class="num">3</span>
+  },
+  <span class="key">"error"</span>: <span class="bool">null</span>
+}</div>
+        </div>
+      </div>
+
+      <!-- GET /api/alerts/{id} -->
+      <div class="endpoint" id="get-alert-id">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method method-get">GET</span>
+          <span class="endpoint-path">/api/alerts/<span class="param">{id}</span></span>
+          <span class="endpoint-name">Alerta por ID</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <p class="endpoint-desc">
+            Retorna todos los datos de una alerta específica dado su identificador único de MongoDB.
+          </p>
+
+          <div class="table-label">Path Parameters</div>
+          <table>
+            <thead><tr><th>Parámetro</th><th>Tipo</th><th>Descripción</th></tr></thead>
+            <tbody>
+              <tr><td><code>id</code><span class="required">requerido</span></td><td>string</td><td>ObjectId de MongoDB de la alerta.</td></tr>
+            </tbody>
+          </table>
+
+          <div class="table-label">Respuestas</div>
+          <div class="responses">
+            <div class="response-item"><span class="status-code status-200">200</span><span class="response-desc"><code>ApiResult&lt;AlertResponse&gt;</code> con los datos de la alerta.</span></div>
+            <div class="response-item"><span class="status-code status-404">404</span><span class="response-desc"><code>ApiResult</code> con <code>success: false</code> y mensaje de error.</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GET /api/alerts/{id}/metrics -->
+      <div class="endpoint" id="get-alert-metrics">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method method-get">GET</span>
+          <span class="endpoint-path">/api/alerts/<span class="param">{id}</span>/metrics</span>
+          <span class="endpoint-name">Métricas de una alerta</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <p class="endpoint-desc">
+            Calcula y retorna métricas agregadas de una alerta: cantidad de avisos de avistamiento,
+            reportes de información, y el alcance geográfico estimado en kilómetros cuadrados.
+          </p>
+
+          <div class="table-label">Path Parameters</div>
+          <table>
+            <thead><tr><th>Parámetro</th><th>Tipo</th><th>Descripción</th></tr></thead>
+            <tbody>
+              <tr><td><code>id</code><span class="required">requerido</span></td><td>string</td><td>ObjectId de MongoDB de la alerta.</td></tr>
+            </tbody>
+          </table>
+
+          <div class="table-label">Respuesta — 200 OK</div>
+          <div class="code-block">{
+  <span class="key">"success"</span>: <span class="bool">true</span>,
+  <span class="key">"data"</span>: {
+    <span class="key">"alertId"</span>: <span class="str">"683b2f..."</span>,
+    <span class="key">"totalAwareness"</span>: <span class="num">47</span>,
+    <span class="key">"totalInfoReports"</span>: <span class="num">12</span>,
+    <span class="key">"geographicReachKm"</span>: <span class="num">3.5</span>
+  },
+  <span class="key">"error"</span>: <span class="bool">null</span>
+}</div>
+        </div>
+      </div>
+
+      <!-- GET /api/alerts/by-emitter/{emitterId} -->
+      <div class="endpoint" id="get-alerts-emitter">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method method-get">GET</span>
+          <span class="endpoint-path">/api/alerts/by-emitter/<span class="param">{emitterId}</span></span>
+          <span class="endpoint-name">Alertas por tipo de emisor</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <p class="endpoint-desc">
+            Filtra y retorna alertas según quién las emitió. Permite distinguir entre alertas
+            reportadas por ciudadanos comunes y las emitidas por entidades oficiales (policía, ONGs, etc.).
+          </p>
+
+          <div class="table-label">Path Parameters</div>
+          <table>
+            <thead><tr><th>Parámetro</th><th>Tipo</th><th>Valores</th></tr></thead>
+            <tbody>
+              <tr><td><code>emitterId</code><span class="required">requerido</span></td><td>integer</td><td><code>1</code> = Ciudadano · <code>2</code> = Entidad</td></tr>
+            </tbody>
+          </table>
+
+          <div class="table-label">Query Parameters</div>
+          <table>
+            <thead><tr><th>Parámetro</th><th>Tipo</th><th>Default</th><th>Descripción</th></tr></thead>
+            <tbody>
+              <tr><td><code>page</code><span class="optional">opcional</span></td><td>integer</td><td>1</td><td>Número de página.</td></tr>
+              <tr><td><code>pageSize</code><span class="optional">opcional</span></td><td>integer</td><td>20</td><td>Ítems por página. Máximo: 100.</td></tr>
+            </tbody>
+          </table>
+
+          <div class="table-label">Respuesta — 200 OK</div>
+          <div class="responses">
+            <div class="response-item"><span class="status-code status-200">200</span><span class="response-desc"><code>ApiResult&lt;PagedResponse&lt;AlertResponse&gt;&gt;</code></span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- POST /api/alerts -->
+      <div class="endpoint" id="post-alert">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method method-post">POST</span>
+          <span class="endpoint-path">/api/alerts</span>
+          <span class="endpoint-name">Crear nueva alerta</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <p class="endpoint-desc">
+            Registra una nueva alerta de persona desaparecida en el sistema. Acepta
+            <code>multipart/form-data</code> para permitir la subida de una foto junto con los datos.
+            Retorna el objeto de alerta creado con su ID generado.
+          </p>
+
+          <div class="table-label">Body — multipart/form-data</div>
+          <table>
+            <thead><tr><th>Campo</th><th>Tipo</th><th>Descripción</th></tr></thead>
+            <tbody>
+              <tr><td><code>firstName</code><span class="required">requerido</span></td><td>string</td><td>Nombre de la persona desaparecida.</td></tr>
+              <tr><td><code>lastName</code><span class="required">requerido</span></td><td>string</td><td>Apellido de la persona desaparecida.</td></tr>
+              <tr><td><code>age</code><span class="required">requerido</span></td><td>integer</td><td>Edad de la persona.</td></tr>
+              <tr><td><code>physicalDescription</code><span class="required">requerido</span></td><td>string</td><td>Descripción física detallada (altura, color de cabello, rasgos, etc.).</td></tr>
+              <tr><td><code>situation</code><span class="required">requerido</span></td><td>string</td><td>Contexto de la desaparición.</td></tr>
+              <tr><td><code>latitude</code><span class="required">requerido</span></td><td>double</td><td>Latitud del último lugar conocido.</td></tr>
+              <tr><td><code>longitude</code><span class="required">requerido</span></td><td>double</td><td>Longitud del último lugar conocido.</td></tr>
+              <tr><td><code>disappearanceDate</code><span class="required">requerido</span></td><td>DateTime</td><td>Fecha/hora de desaparición en formato ISO 8601.</td></tr>
+              <tr><td><code>emitterId</code><span class="required">requerido</span></td><td>integer</td><td><code>1</code> = Ciudadano · <code>2</code> = Entidad.</td></tr>
+              <tr><td><code>photo</code><span class="optional">opcional</span></td><td>file</td><td>Imagen de la persona (JPG, PNG).</td></tr>
+            </tbody>
+          </table>
+
+          <div class="table-label">Respuesta — 201 Created</div>
+          <div class="code-block">{
+  <span class="key">"success"</span>: <span class="bool">true</span>,
+  <span class="key">"data"</span>: {
+    <span class="key">"id"</span>: <span class="str">"683b2f4c1a2b3c4d5e6f7890"</span>,
+    <span class="key">"firstName"</span>: <span class="str">"Juan"</span>,
+    <span class="key">"lastName"</span>: <span class="str">"Pérez"</span>,
+    <span class="key">"age"</span>: <span class="num">35</span>,
+    <span class="key">"physicalDescription"</span>: <span class="str">"Hombre 1.75m..."</span>,
+    <span class="key">"photoUrl"</span>: <span class="str">""</span>,
+    <span class="key">"situation"</span>: <span class="str">"Visto en el centro..."</span>,
+    <span class="key">"lastKnownLatitude"</span>: <span class="num">-34.6037</span>,
+    <span class="key">"lastKnownLongitude"</span>: <span class="num">-58.3816</span>,
+    <span class="key">"disappearanceDate"</span>: <span class="str">"2026-05-26T08:00:00"</span>,
+    <span class="key">"emitterId"</span>: <span class="num">1</span>,
+    <span class="key">"emittedAt"</span>: <span class="str">"2026-05-28T10:00:00"</span>,
+    <span class="key">"status"</span>: <span class="num">0</span>
+  },
+  <span class="key">"error"</span>: <span class="bool">null</span>
+}</div>
+        </div>
+      </div>
+
+      <!-- PATCH /api/alerts/{id}/status -->
+      <div class="endpoint" id="patch-alert-status">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method method-patch">PATCH</span>
+          <span class="endpoint-path">/api/alerts/<span class="param">{id}</span>/status</span>
+          <span class="endpoint-name">Actualizar estado de alerta</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <p class="endpoint-desc">
+            Modifica el estado de una alerta existente. Permite marcarla como resuelta
+            (persona encontrada) o cancelada (falsa alarma, duplicado, etc.).
+          </p>
+
+          <div class="table-label">Path Parameters</div>
+          <table>
+            <thead><tr><th>Parámetro</th><th>Tipo</th><th>Descripción</th></tr></thead>
+            <tbody>
+              <tr><td><code>id</code><span class="required">requerido</span></td><td>string</td><td>ObjectId de MongoDB de la alerta.</td></tr>
+            </tbody>
+          </table>
+
+          <div class="table-label">Body — application/json</div>
+          <div class="code-block">{
+  <span class="key">"status"</span>: <span class="num">1</span>  <span class="comment">// 0 = Active | 1 = Resolved | 2 = Cancelled</span>
+}</div>
+
+          <div class="table-label">Respuestas</div>
+          <div class="responses">
+            <div class="response-item"><span class="status-code status-200">200</span><span class="response-desc"><code>ApiResult&lt;bool&gt;</code> con <code>data: true</code> si la actualización fue exitosa.</span></div>
+            <div class="response-item"><span class="status-code status-404">404</span><span class="response-desc">Alerta no encontrada.</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════ REPORTS ═══ -->
+    <div class="section">
+      <div class="section-title">Reports</div>
+      <div class="section-desc">
+        Reportes ciudadanos almacenados en <strong>Cassandra</strong>. Diseñados para soportar
+        alta frecuencia de escritura. Existen dos tipos: <em>Awareness</em> (avistamiento simple)
+        e <em>Info</em> (reporte detallado con descripción y foto opcional). Un
+        <code>BackgroundService</code> los agrega en el heatmap de MongoDB cada 15 segundos.
+      </div>
+
+      <!-- POST /api/reports/awareness -->
+      <div class="endpoint" id="post-awareness">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method method-post">POST</span>
+          <span class="endpoint-path">/api/reports/awareness</span>
+          <span class="endpoint-name">Crear reporte de awareness</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <p class="endpoint-desc">
+            Registra un avistamiento ciudadano básico: "vi a esta persona aquí en este momento".
+            Es el tipo de reporte más liviano y de alta frecuencia. Solo requiere ubicación y timestamp.
+            Se persiste en Cassandra con partition key compuesta por <code>alert_id</code> y <code>time_bucket</code>.
+          </p>
+
+          <div class="table-label">Body — application/json</div>
+          <div class="code-block">{
+  <span class="key">"alertId"</span>: <span class="str">"683b2f4c1a2b3c4d5e6f7890"</span>,
+  <span class="key">"latitude"</span>: <span class="num">-34.6045</span>,
+  <span class="key">"longitude"</span>: <span class="num">-58.3850</span>,
+  <span class="key">"reportedAt"</span>: <span class="str">"2026-05-28T14:30:00"</span>
+}</div>
+
+          <div class="table-label">Campos</div>
+          <table>
+            <thead><tr><th>Campo</th><th>Tipo</th><th>Descripción</th></tr></thead>
+            <tbody>
+              <tr><td><code>alertId</code><span class="required">requerido</span></td><td>string</td><td>ID de la alerta asociada al reporte.</td></tr>
+              <tr><td><code>latitude</code><span class="required">requerido</span></td><td>double</td><td>Latitud donde se realizó el avistamiento.</td></tr>
+              <tr><td><code>longitude</code><span class="required">requerido</span></td><td>double</td><td>Longitud donde se realizó el avistamiento.</td></tr>
+              <tr><td><code>reportedAt</code><span class="required">requerido</span></td><td>DateTime</td><td>Fecha y hora del avistamiento (ISO 8601).</td></tr>
+            </tbody>
+          </table>
+
+          <div class="table-label">Respuesta — 200 OK</div>
+          <div class="code-block">{
+  <span class="key">"success"</span>: <span class="bool">true</span>,
+  <span class="key">"data"</span>: {
+    <span class="key">"id"</span>: <span class="str">"a1b2c3d4-e5f6-7890-abcd-ef1234567890"</span>,
+    <span class="key">"alertId"</span>: <span class="str">"683b2f4c1a2b3c4d5e6f7890"</span>,
+    <span class="key">"type"</span>: <span class="num">0</span>,  <span class="comment">// 0 = Awareness</span>
+    <span class="key">"latitude"</span>: <span class="num">-34.6045</span>,
+    <span class="key">"longitude"</span>: <span class="num">-58.3850</span>,
+    <span class="key">"reportedAt"</span>: <span class="str">"2026-05-28T14:30:00"</span>,
+    <span class="key">"description"</span>: <span class="bool">null</span>,
+    <span class="key">"photoUrl"</span>: <span class="bool">null</span>
+  },
+  <span class="key">"error"</span>: <span class="bool">null</span>
+}</div>
+        </div>
+      </div>
+
+      <!-- POST /api/reports/info -->
+      <div class="endpoint" id="post-info">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method method-post">POST</span>
+          <span class="endpoint-path">/api/reports/info</span>
+          <span class="endpoint-name">Crear reporte de información</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <p class="endpoint-desc">
+            Registra un reporte detallado con descripción textual y foto opcional.
+            Más pesado que un awareness pero aporta información contextual valiosa para la búsqueda.
+            También se persiste en Cassandra.
+          </p>
+
+          <div class="table-label">Body — multipart/form-data</div>
+          <table>
+            <thead><tr><th>Campo</th><th>Tipo</th><th>Descripción</th></tr></thead>
+            <tbody>
+              <tr><td><code>alertId</code><span class="required">requerido</span></td><td>string</td><td>ID de la alerta asociada.</td></tr>
+              <tr><td><code>latitude</code><span class="required">requerido</span></td><td>double</td><td>Latitud del avistamiento.</td></tr>
+              <tr><td><code>longitude</code><span class="required">requerido</span></td><td>double</td><td>Longitud del avistamiento.</td></tr>
+              <tr><td><code>description</code><span class="required">requerido</span></td><td>string</td><td>Descripción textual del avistamiento o información obtenida.</td></tr>
+              <tr><td><code>reportedAt</code><span class="required">requerido</span></td><td>DateTime</td><td>Fecha y hora (ISO 8601).</td></tr>
+              <tr><td><code>photo</code><span class="optional">opcional</span></td><td>file</td><td>Imagen evidencia (JPG, PNG).</td></tr>
+            </tbody>
+          </table>
+
+          <div class="table-label">Respuesta — 200 OK</div>
+          <div class="responses">
+            <div class="response-item"><span class="status-code status-200">200</span><span class="response-desc"><code>ApiResult&lt;CitizenReport&gt;</code> con <code>type: 1</code> (Info) y los campos <code>description</code> / <code>photoUrl</code> poblados.</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GET /api/reports/by-alert/{alertId} -->
+      <div class="endpoint" id="get-reports">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method method-get">GET</span>
+          <span class="endpoint-path">/api/reports/by-alert/<span class="param">{alertId}</span></span>
+          <span class="endpoint-name">Reportes de una alerta</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <p class="endpoint-desc">
+            Retorna todos los reportes ciudadanos (awareness e info) asociados a una alerta específica,
+            ordenados cronológicamente. Lee desde Cassandra.
+          </p>
+
+          <div class="table-label">Path Parameters</div>
+          <table>
+            <thead><tr><th>Parámetro</th><th>Tipo</th><th>Descripción</th></tr></thead>
+            <tbody>
+              <tr><td><code>alertId</code><span class="required">requerido</span></td><td>string</td><td>ID de la alerta cuyos reportes se quieren listar.</td></tr>
+            </tbody>
+          </table>
+
+          <div class="table-label">Query Parameters</div>
+          <table>
+            <thead><tr><th>Parámetro</th><th>Tipo</th><th>Default</th><th>Descripción</th></tr></thead>
+            <tbody>
+              <tr><td><code>page</code><span class="optional">opcional</span></td><td>integer</td><td>1</td><td>Número de página.</td></tr>
+              <tr><td><code>pageSize</code><span class="optional">opcional</span></td><td>integer</td><td>50</td><td>Ítems por página. Máximo: 100.</td></tr>
+            </tbody>
+          </table>
+
+          <div class="table-label">Respuesta — 200 OK</div>
+          <div class="responses">
+            <div class="response-item"><span class="status-code status-200">200</span><span class="response-desc"><code>ApiResult&lt;PagedResponse&lt;CitizenReport&gt;&gt;</code></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════ STATS ═══ -->
+    <div class="section">
+      <div class="section-title">Stats</div>
+      <div class="section-desc">
+        Estadísticas agregadas y datos de heatmap geográfico. El heatmap se genera en
+        <strong>MongoDB</strong> mediante el <code>HeatmapSyncService</code> que procesa incrementalmente
+        los reportes de Cassandra cada 15 segundos. Cada celda representa una zona de ~1 km².
+      </div>
+
+      <!-- GET /api/stats/overview -->
+      <div class="endpoint" id="get-overview">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method method-get">GET</span>
+          <span class="endpoint-path">/api/stats/overview</span>
+          <span class="endpoint-name">Resumen estadístico general</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <p class="endpoint-desc">
+            Retorna un snapshot global del estado del sistema: totales de alertas por estado
+            y totales de reportes ciudadanos por tipo.
+          </p>
+
+          <div class="table-label">Respuesta — 200 OK</div>
+          <div class="code-block">{
+  <span class="key">"success"</span>: <span class="bool">true</span>,
+  <span class="key">"data"</span>: {
+    <span class="key">"totalAlerts"</span>: <span class="num">150</span>,
+    <span class="key">"activeAlerts"</span>: <span class="num">42</span>,
+    <span class="key">"resolvedAlerts"</span>: <span class="num">98</span>,
+    <span class="key">"cancelledAlerts"</span>: <span class="num">10</span>,
+    <span class="key">"totalReports"</span>: <span class="num">8742</span>,
+    <span class="key">"totalAwarenessReports"</span>: <span class="num">7900</span>,
+    <span class="key">"totalInfoReports"</span>: <span class="num">842</span>
+  },
+  <span class="key">"error"</span>: <span class="bool">null</span>
+}</div>
+        </div>
+      </div>
+
+      <!-- GET /api/stats/heatmap -->
+      <div class="endpoint" id="get-heatmap">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method method-get">GET</span>
+          <span class="endpoint-path">/api/stats/heatmap</span>
+          <span class="endpoint-name">Datos de heatmap geográfico</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <p class="endpoint-desc">
+            Retorna las celdas del heatmap geográfico. Sin parámetros devuelve el mapa global
+            (todas las alertas combinadas). Con <code>alertId</code> filtra para una alerta específica,
+            permitiendo visualizar la distribución geográfica de los reportes de una persona.
+            La intensidad ponderada combina awareness (peso 1) e info (peso 3).
+          </p>
+
+          <div class="table-label">Query Parameters</div>
+          <table>
+            <thead><tr><th>Parámetro</th><th>Tipo</th><th>Descripción</th></tr></thead>
+            <tbody>
+              <tr><td><code>alertId</code><span class="optional">opcional</span></td><td>string</td><td>Si se provee, filtra el heatmap para esa alerta. Si se omite, retorna el heatmap global.</td></tr>
+            </tbody>
+          </table>
+
+          <div class="table-label">Respuesta — 200 OK</div>
+          <div class="code-block">{
+  <span class="key">"success"</span>: <span class="bool">true</span>,
+  <span class="key">"data"</span>: {
+    <span class="key">"alertId"</span>: <span class="bool">null</span>,  <span class="comment">// null = global, o el ID si se filtró</span>
+    <span class="key">"cells"</span>: [
+      {
+        <span class="key">"centerLatitude"</span>: <span class="num">-34.60</span>,
+        <span class="key">"centerLongitude"</span>: <span class="num">-58.38</span>,
+        <span class="key">"awarenessCount"</span>: <span class="num">23</span>,
+        <span class="key">"infoCount"</span>: <span class="num">5</span>,
+        <span class="key">"weightedIntensity"</span>: <span class="num">38.0</span>,
+        <span class="key">"lastUpdated"</span>: <span class="str">"2026-05-28T14:45:00"</span>
+      }
+    ]
+  },
+  <span class="key">"error"</span>: <span class="bool">null</span>
+}</div>
+
+          <div class="note">
+            <span class="note-icon">ℹ</span>
+            <span>La celda del heatmap usa geohash con precisión de 2 decimales (~1 km² por celda). <code>weightedIntensity</code> = <code>awarenessCount × 1 + infoCount × 3</code>.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════ NOTIFICATIONS ═══ -->
+    <div class="section">
+      <div class="section-title">Notifications</div>
+      <div class="section-desc">
+        Gestión de tokens de notificaciones push mediante <strong>Firebase Cloud Messaging (FCM)</strong>.
+        En esta versión MVP el token se registra en el log del servidor. En producción se persistirá en
+        base de datos y se usará para enviar notificaciones a dispositivos móviles cuando se creen nuevas alertas.
+      </div>
+
+      <!-- POST /api/notifications/register-token -->
+      <div class="endpoint" id="post-token">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method method-post">POST</span>
+          <span class="endpoint-path">/api/notifications/register-token</span>
+          <span class="endpoint-name">Registrar token FCM</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <p class="endpoint-desc">
+            Registra el token de dispositivo de Firebase Cloud Messaging asociado a un rol de usuario.
+            Utilizado por la app móvil al iniciar sesión para habilitar notificaciones push.
+          </p>
+
+          <div class="table-label">Body — application/json</div>
+          <div class="code-block">{
+  <span class="key">"token"</span>: <span class="str">"dGhpcyBpcyBhIGZha2UgRkNNIHRva2Vu..."</span>,
+  <span class="key">"role"</span>: <span class="str">"citizen"</span>  <span class="comment">// "citizen" | "entity"</span>
+}</div>
+
+          <div class="table-label">Campos</div>
+          <table>
+            <thead><tr><th>Campo</th><th>Tipo</th><th>Descripción</th></tr></thead>
+            <tbody>
+              <tr><td><code>token</code><span class="required">requerido</span></td><td>string</td><td>Token FCM generado por el SDK de Firebase en el dispositivo móvil.</td></tr>
+              <tr><td><code>role</code><span class="required">requerido</span></td><td>string</td><td>Rol del usuario: <code>"citizen"</code> o <code>"entity"</code>.</td></tr>
+            </tbody>
+          </table>
+
+          <div class="table-label">Respuesta — 200 OK</div>
+          <div class="code-block">{
+  <span class="key">"success"</span>: <span class="bool">true</span>,
+  <span class="key">"data"</span>: <span class="bool">true</span>,
+  <span class="key">"error"</span>: <span class="bool">null</span>
+}</div>
+
+          <div class="note">
+            <span class="note-icon">ℹ</span>
+            <span>MVP: el token solo se loguea en el servidor. No se persiste ni se usa para envíos reales en esta versión.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════ MODELOS ═══ -->
+    <div class="section">
+      <div class="section-title">Modelos de referencia</div>
+
+      <div class="table-label">Enum: AlertStatus</div>
+      <table style="margin-bottom:20px">
+        <thead><tr><th>Valor</th><th>Nombre</th><th>Descripción</th></tr></thead>
+        <tbody>
+          <tr><td><code>0</code></td><td>Active</td><td>Alerta activa, persona aún no localizada.</td></tr>
+          <tr><td><code>1</code></td><td>Resolved</td><td>Persona encontrada, alerta resuelta.</td></tr>
+          <tr><td><code>2</code></td><td>Cancelled</td><td>Alerta cancelada (falsa alarma, duplicado).</td></tr>
+        </tbody>
+      </table>
+
+      <div class="table-label">Enum: ReportType</div>
+      <table style="margin-bottom:20px">
+        <thead><tr><th>Valor</th><th>Nombre</th><th>Descripción</th></tr></thead>
+        <tbody>
+          <tr><td><code>0</code></td><td>Awareness</td><td>Avistamiento simple, solo ubicación y timestamp.</td></tr>
+          <tr><td><code>1</code></td><td>Info</td><td>Reporte detallado con descripción y foto opcional.</td></tr>
+        </tbody>
+      </table>
+
+      <div class="table-label">Wrapper genérico: ApiResult&lt;T&gt;</div>
+      <div class="code-block">{
+  <span class="key">"success"</span>: <span class="bool">boolean</span>,   <span class="comment">// true si la operación fue exitosa</span>
+  <span class="key">"data"</span>: <span class="str">T | null</span>,       <span class="comment">// payload de la respuesta</span>
+  <span class="key">"error"</span>: <span class="str">string | null</span>  <span class="comment">// mensaje de error si success = false</span>
+}</div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  function toggle(header) {
+    header.closest('.endpoint').classList.toggle('open');
+  }
+
+  function openAndScroll(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.add('open');
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+</script>
+</body>
+</html>

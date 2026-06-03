@@ -1,0 +1,438 @@
+{
+  "info": {
+    "name": "SafeSight API",
+    "_postman_id": "safesight-api-collection-v1",
+    "description": "Colección completa de endpoints para la SafeSight API — sistema de alertas de personas desaparecidas con arquitectura dual NoSQL (MongoDB + Cassandra).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5121",
+      "type": "string",
+      "description": "URL base de la API"
+    },
+    {
+      "key": "alertId",
+      "value": "",
+      "type": "string",
+      "description": "ID de alerta para reutilizar entre requests"
+    }
+  ],
+  "item": [
+    {
+      "name": "Alerts",
+      "description": "Gestión de alertas de personas desaparecidas almacenadas en MongoDB.",
+      "item": [
+        {
+          "name": "Obtener alertas activas (paginado)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/alerts?page=1&pageSize=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "alerts"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Número de página (default: 1)"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "description": "Tamaño de página (default: 20, máximo: 100)"
+                }
+              ]
+            },
+            "description": "Retorna una lista paginada de todas las alertas activas registradas en el sistema."
+          },
+          "response": []
+        },
+        {
+          "name": "Obtener alerta por ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/alerts/{{alertId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "alerts", "{{alertId}}"]
+            },
+            "description": "Retorna los datos completos de una alerta específica dado su ID."
+          },
+          "response": []
+        },
+        {
+          "name": "Obtener métricas de una alerta",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/alerts/{{alertId}}/metrics",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "alerts", "{{alertId}}", "metrics"]
+            },
+            "description": "Retorna métricas calculadas para una alerta: total de avisos, reportes de información y alcance geográfico en km."
+          },
+          "response": []
+        },
+        {
+          "name": "Obtener alertas por emisor",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/alerts/by-emitter/1?page=1&pageSize=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "alerts", "by-emitter", "1"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Número de página (default: 1)"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "description": "Tamaño de página (default: 20, máximo: 100)"
+                }
+              ]
+            },
+            "description": "Retorna alertas filtradas por emisor. EmitterId: 1 = ciudadano, 2 = entidad."
+          },
+          "response": []
+        },
+        {
+          "name": "Crear nueva alerta",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.success && json.data && json.data.id) {",
+                  "    pm.collectionVariables.set('alertId', json.data.id);",
+                  "    console.log('alertId guardado:', json.data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "firstName",
+                  "value": "Juan",
+                  "type": "text",
+                  "description": "Nombre de la persona desaparecida"
+                },
+                {
+                  "key": "lastName",
+                  "value": "Pérez",
+                  "type": "text",
+                  "description": "Apellido de la persona desaparecida"
+                },
+                {
+                  "key": "age",
+                  "value": "35",
+                  "type": "text",
+                  "description": "Edad"
+                },
+                {
+                  "key": "physicalDescription",
+                  "value": "Hombre de 1.75m, cabello castaño, ojos marrones, usa anteojos.",
+                  "type": "text",
+                  "description": "Descripción física detallada"
+                },
+                {
+                  "key": "situation",
+                  "value": "Fue visto por última vez en el centro de la ciudad el lunes por la mañana.",
+                  "type": "text",
+                  "description": "Descripción de la situación"
+                },
+                {
+                  "key": "latitude",
+                  "value": "-34.6037",
+                  "type": "text",
+                  "description": "Latitud del último lugar conocido"
+                },
+                {
+                  "key": "longitude",
+                  "value": "-58.3816",
+                  "type": "text",
+                  "description": "Longitud del último lugar conocido"
+                },
+                {
+                  "key": "disappearanceDate",
+                  "value": "2026-05-26T08:00:00",
+                  "type": "text",
+                  "description": "Fecha y hora de desaparición (ISO 8601)"
+                },
+                {
+                  "key": "emitterId",
+                  "value": "1",
+                  "type": "text",
+                  "description": "1 = ciudadano, 2 = entidad"
+                },
+                {
+                  "key": "photo",
+                  "type": "file",
+                  "src": [],
+                  "description": "Foto de la persona (opcional)",
+                  "disabled": true
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/alerts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "alerts"]
+            },
+            "description": "Crea una nueva alerta de persona desaparecida. Acepta multipart/form-data para permitir adjuntar foto. El ID generado se guarda automáticamente en la variable `alertId`."
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar estado de alerta",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/alerts/{{alertId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "alerts", "{{alertId}}", "status"]
+            },
+            "description": "Actualiza el estado de una alerta. Valores posibles para `status`: 0 = Active, 1 = Resolved, 2 = Cancelled."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Reports",
+      "description": "Gestión de reportes ciudadanos almacenados en Cassandra. Soporta dos tipos: Awareness (avistamiento) e Info (información con detalle).",
+      "item": [
+        {
+          "name": "Crear reporte de awareness (avistamiento)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"alertId\": \"{{alertId}}\",\n  \"latitude\": -34.6045,\n  \"longitude\": -58.3850,\n  \"reportedAt\": \"2026-05-28T14:30:00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/reports/awareness",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "reports", "awareness"]
+            },
+            "description": "Registra un avistamiento ciudadano de la persona desaparecida. Solo requiere ubicación y timestamp — es el reporte más liviano y de alta frecuencia. Se almacena en Cassandra."
+          },
+          "response": []
+        },
+        {
+          "name": "Crear reporte de información",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "alertId",
+                  "value": "{{alertId}}",
+                  "type": "text",
+                  "description": "ID de la alerta asociada"
+                },
+                {
+                  "key": "latitude",
+                  "value": "-34.6082",
+                  "type": "text",
+                  "description": "Latitud donde se obtuvo la información"
+                },
+                {
+                  "key": "longitude",
+                  "value": "-58.3800",
+                  "type": "text",
+                  "description": "Longitud donde se obtuvo la información"
+                },
+                {
+                  "key": "description",
+                  "value": "Lo vi entrar a la panadería de la esquina alrededor de las 10am, llevaba una mochila azul.",
+                  "type": "text",
+                  "description": "Descripción detallada del avistamiento"
+                },
+                {
+                  "key": "reportedAt",
+                  "value": "2026-05-28T15:00:00",
+                  "type": "text",
+                  "description": "Fecha y hora del reporte (ISO 8601)"
+                },
+                {
+                  "key": "photo",
+                  "type": "file",
+                  "src": [],
+                  "description": "Foto evidencia (opcional)",
+                  "disabled": true
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/reports/info",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "reports", "info"]
+            },
+            "description": "Registra un reporte detallado con descripción textual y foto opcional. Más pesado que awareness pero aporta más información contextual. Se almacena en Cassandra."
+          },
+          "response": []
+        },
+        {
+          "name": "Obtener reportes de una alerta (paginado)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reports/by-alert/{{alertId}}?page=1&pageSize=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "reports", "by-alert", "{{alertId}}"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Número de página (default: 1)"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "50",
+                  "description": "Tamaño de página (default: 50, máximo: 100)"
+                }
+              ]
+            },
+            "description": "Retorna todos los reportes ciudadanos asociados a una alerta específica, ordenados cronológicamente."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Stats",
+      "description": "Estadísticas y datos de heatmap generados desde el proceso de sincronización Cassandra → MongoDB.",
+      "item": [
+        {
+          "name": "Resumen estadístico general",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/stats/overview",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "stats", "overview"]
+            },
+            "description": "Retorna un resumen global del sistema: total de alertas por estado, total de reportes por tipo."
+          },
+          "response": []
+        },
+        {
+          "name": "Datos de heatmap (global)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/stats/heatmap",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "stats", "heatmap"]
+            },
+            "description": "Retorna todas las celdas del heatmap global (todas las alertas combinadas). Cada celda representa una zona geográfica de ~1 km² con conteos de awareness e info."
+          },
+          "response": []
+        },
+        {
+          "name": "Datos de heatmap (por alerta)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/stats/heatmap?alertId={{alertId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "stats", "heatmap"],
+              "query": [
+                {
+                  "key": "alertId",
+                  "value": "{{alertId}}",
+                  "description": "Filtrar heatmap por alerta específica"
+                }
+              ]
+            },
+            "description": "Retorna las celdas del heatmap filtradas para una alerta específica. Útil para visualizar la distribución geográfica de reportes de una sola persona."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "description": "Gestión de tokens de notificaciones push (Firebase Cloud Messaging).",
+      "item": [
+        {
+          "name": "Registrar token FCM",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"dGhpcyBpcyBhIGZha2UgZmNtIHRva2VuIGZvciB0ZXN0aW5n\",\n  \"role\": \"citizen\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications/register-token",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "notifications", "register-token"]
+            },
+            "description": "Registra un token FCM de un dispositivo móvil para recibir notificaciones push. En esta versión MVP el token se registra en el log del servidor. Roles: 'citizen', 'entity'."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

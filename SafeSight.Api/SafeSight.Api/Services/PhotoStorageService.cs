@@ -15,7 +15,8 @@ public class PhotoStorageService : IPhotoStorageService
 
     public PhotoStorageService(IWebHostEnvironment env, IOptions<PhotoSettings> settings, ILogger<PhotoStorageService> logger)
     {
-        _storagePath = Path.Combine(env.WebRootPath, "photos");
+        string webRoot = env.WebRootPath ?? Path.Combine(env.ContentRootPath, "wwwroot");
+        _storagePath = Path.Combine(webRoot, "photos");
         _maxFileSizeBytes = settings.Value.MaxFileSizeMb * 1024L * 1024L;
         _logger = logger;
 

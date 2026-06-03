@@ -1,4 +1,4 @@
-namespace SafeSight.Api.Models.Configuration;
+﻿namespace SafeSight.Api.Models.Configuration;
 
 // Para cambiar el entorno (local → Docker → producción):
 // solo modificar los valores en appsettings.json o variables de entorno.
@@ -26,6 +26,7 @@ public class CassandraSettings
     public List<string> ContactPoints { get; set; } = new() { "localhost" };
     public int Port { get; set; } = 9042;
     public string Keyspace { get; set; } = "safesight";
+    public string LocalDatacenter { get; set; } = "datacenter1";
     // Credenciales opcionales. Dejar vacío si Cassandra no tiene autenticación habilitada.
     public string? Username { get; set; }
     public string? Password { get; set; }
