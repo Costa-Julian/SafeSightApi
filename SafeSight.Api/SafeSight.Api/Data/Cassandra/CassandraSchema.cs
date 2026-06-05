@@ -39,6 +39,15 @@ public class CassandraSchema
         await _session.ExecuteAsync(new global::Cassandra.SimpleStatement($"USE {_settings.Keyspace}"));
     }
 
+    private async Task TryAlterTableAsync(string cql)
+    {
+        try { await _session.ExecuteAsync(new global::Cassandra.SimpleStatement(cql)); }
+        catch (global::Cassandra.AlreadyExistsException) { }
+        catch (global::Cassandra.InvalidQueryException ex) when (
+            ex.Message.Contains("conflicts with an existing column") ||
+            ex.Message.Contains("already exists")) { }
+    }
+
     private async Task CreateTablesAsync()
     {
         // Tabla principal de reportes ciudadanos, organizada para lecturas por alerta.
@@ -55,12 +64,18 @@ public class CassandraSchema
                 reported_at TIMESTAMP,
                 id          UUID,
                 type        INT,
+                citizen_id  TEXT,
                 latitude    DOUBLE,
                 longitude   DOUBLE,
                 description TEXT,
                 photo_url   TEXT,
                 PRIMARY KEY ((alert_id, time_bucket), reported_at, id)
             ) WITH CLUSTERING ORDER BY (reported_at ASC, id ASC)"));
+
+        // Migrations: add columns that may be missing in pre-existing tables.
+        await TryAlterTableAsync($"ALTER TABLE {_settings.Keyspace}.citizen_reports ADD citizen_id TEXT");
+        await TryAlterTableAsync($"ALTER TABLE {_settings.Keyspace}.citizen_reports ADD description TEXT");
+        await TryAlterTableAsync($"ALTER TABLE {_settings.Keyspace}.citizen_reports ADD photo_url TEXT");
 
         // Tabla secundaria para el HeatmapSyncService.
         // Partition key: time_bucket (solo fecha)
@@ -76,6 +91,23 @@ public class CassandraSchema
                 type        INT,
                 latitude    DOUBLE,
                 longitude   DOUBLE,
+                PRIMARY KEY (time_bucket, reported_at, id)
+            ) WITH CLUSTERING ORDER BY (reported_at ASC, id ASC)"));
+
+        // Tabla de sync para info reports con campos completos.
+        // Solo se escribe cuando type = Info. Permite al InfoReportSyncService
+        // migrar reportes completos (con citizen_id, description, photo_url) a MongoDB.
+        await _session.ExecuteAsync(new global::Cassandra.SimpleStatement(@"
+            CREATE TABLE IF NOT EXISTS info_reports_sync (
+                time_bucket TEXT,
+                reported_at TIMESTAMP,
+                id          UUID,
+                alert_id    TEXT,
+                citizen_id  TEXT,
+                latitude    DOUBLE,
+                longitude   DOUBLE,
+                description TEXT,
+                photo_url   TEXT,
                 PRIMARY KEY (time_bucket, reported_at, id)
             ) WITH CLUSTERING ORDER BY (reported_at ASC, id ASC)"));
 

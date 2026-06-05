@@ -19,6 +19,7 @@ public class MongoConfiguration
     {
         await EnsureAlertIndexesAsync();
         await EnsureHeatmapIndexesAsync();
+        await EnsureInfoReportsIndexesAsync();
         _logger.LogInformation("MongoDB indexes verified");
     }
 
@@ -51,5 +52,18 @@ public class MongoConfiguration
         IndexKeysDefinition<HeatmapCell> alertIndex = Builders<HeatmapCell>.IndexKeys.Ascending("AlertId");
         await collection.Indexes.CreateOneAsync(
             new CreateIndexModel<HeatmapCell>(alertIndex, new CreateIndexOptions { Name = "idx_heatmap_alertid" }));
+    }
+
+    private async Task EnsureInfoReportsIndexesAsync()
+    {
+        IMongoCollection<InfoReportDocument> collection = _database.GetCollection<InfoReportDocument>("info_reports");
+
+        IndexKeysDefinition<InfoReportDocument> alertIndex = Builders<InfoReportDocument>.IndexKeys.Ascending("AlertId");
+        await collection.Indexes.CreateOneAsync(
+            new CreateIndexModel<InfoReportDocument>(alertIndex, new CreateIndexOptions { Name = "idx_inforeports_alertid" }));
+
+        IndexKeysDefinition<InfoReportDocument> citizenIndex = Builders<InfoReportDocument>.IndexKeys.Ascending("CitizenId");
+        await collection.Indexes.CreateOneAsync(
+            new CreateIndexModel<InfoReportDocument>(citizenIndex, new CreateIndexOptions { Name = "idx_inforeports_citizenid" }));
     }
 }

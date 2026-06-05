@@ -3,6 +3,7 @@ using SafeSight.Api.Common;
 using SafeSight.Api.Models.Domain;
 using SafeSight.Api.Models.Dtos.Requests;
 using SafeSight.Api.Models.Dtos.Responses;
+using SafeSight.Api.Repositories.Interfaces;
 using SafeSight.Api.Services.Interfaces;
 
 namespace SafeSight.Api.Controllers;
@@ -12,11 +13,16 @@ namespace SafeSight.Api.Controllers;
 public class ReportsController : ControllerBase
 {
     private readonly IReportsService _reportsService;
+    private readonly IInfoReportsMongoRepository _infoReportsMongoRepository;
     private readonly ILogger<ReportsController> _logger;
 
-    public ReportsController(IReportsService reportsService, ILogger<ReportsController> logger)
+    public ReportsController(
+        IReportsService reportsService,
+        IInfoReportsMongoRepository infoReportsMongoRepository,
+        ILogger<ReportsController> logger)
     {
         _reportsService = reportsService;
+        _infoReportsMongoRepository = infoReportsMongoRepository;
         _logger = logger;
     }
 
@@ -46,5 +52,16 @@ public class ReportsController : ControllerBase
         pageSize = Math.Clamp(pageSize, 1, 100);
         PagedResponse<CitizenReport> result = await _reportsService.GetByAlertAsync(alertId, page, pageSize);
         return Ok(ApiResult<PagedResponse<CitizenReport>>.Ok(result));
+    }
+
+    [HttpGet("info/by-alert/{alertId}")]
+    public async Task<ActionResult<ApiResult<PagedResponse<InfoReportDocument>>>> GetInfoByAlert(
+        string alertId,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50)
+    {
+        pageSize = Math.Clamp(pageSize, 1, 100);
+        PagedResponse<InfoReportDocument> result = await _infoReportsMongoRepository.GetByAlertAsync(alertId, page, pageSize);
+        return Ok(ApiResult<PagedResponse<InfoReportDocument>>.Ok(result));
     }
 }

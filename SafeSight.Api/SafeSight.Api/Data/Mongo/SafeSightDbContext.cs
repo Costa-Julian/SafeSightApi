@@ -14,6 +14,8 @@ public class SafeSightDbContext : DbContext
 
     public DbSet<Alert> Alerts => Set<Alert>();
     public DbSet<HeatmapCell> HeatmapCells => Set<HeatmapCell>();
+    public DbSet<InfoReportDocument> InfoReports => Set<InfoReportDocument>();
+    public DbSet<DeviceToken> DeviceTokens => Set<DeviceToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -21,8 +23,11 @@ public class SafeSightDbContext : DbContext
 
         modelBuilder.Entity<Alert>().ToCollection("alerts");
         modelBuilder.Entity<HeatmapCell>().ToCollection("heatmap_cells");
+        modelBuilder.Entity<InfoReportDocument>().ToCollection("info_reports");
 
         modelBuilder.Entity<Alert>().OwnsOne(a => a.MissingPerson);
         modelBuilder.Entity<Alert>().OwnsOne(a => a.LastKnownLocation);
+
+        modelBuilder.Entity<DeviceToken>().ToCollection("device_tokens");
     }
 }

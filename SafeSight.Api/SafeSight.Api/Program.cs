@@ -1,7 +1,10 @@
+using FirebaseAdmin;
 using FluentValidation;
+using Google.Apis.Auth.OAuth2;
 using FluentValidation.AspNetCore;
 using Microsoft.EntityFrameworkCore;
 using MongoDB.Driver;
+using System.Globalization;
 using SafeSight.Api.BackgroundServices;
 using SafeSight.Api.Data.Cassandra;
 using SafeSight.Api.Data.Mongo;
@@ -12,6 +15,9 @@ using SafeSight.Api.Seed;
 using SafeSight.Api.Services;
 using SafeSight.Api.Services.Interfaces;
 using System.Text.Json.Serialization;
+
+CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
+CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
@@ -47,17 +53,35 @@ builder.Services.AddSingleton<MongoConfiguration>();
 builder.Services.AddSingleton<CassandraSessionFactory>();
 builder.Services.AddSingleton<CassandraSchema>();
 
+// ── Firebase Admin SDK ────────────────────────────────────────────────────────
+string firebaseCredsPath = Path.Combine(builder.Environment.ContentRootPath, "firebase-adminsdk.json");
+if (File.Exists(firebaseCredsPath))
+{
+    FirebaseApp.Create(new AppOptions
+    {
+        Credential = GoogleCredential.FromFile(firebaseCredsPath)
+    });
+    Console.WriteLine("Firebase Admin SDK inicializado.");
+}
+else
+{
+    Console.WriteLine("ADVERTENCIA: firebase-adminsdk.json no encontrado. Las notificaciones push no funcionarán.");
+}
+
 // ── Repositorios (Scoped) ─────────────────────────────────────────────────────
 builder.Services.AddScoped<IAlertsRepository, AlertsRepository>();
 builder.Services.AddScoped<IReportsRepository, ReportsRepository>();
 builder.Services.AddScoped<IHeatmapRepository, HeatmapRepository>();
+builder.Services.AddScoped<IInfoReportsMongoRepository, InfoReportsMongoRepository>();
 builder.Services.AddScoped<IStatsRepository, StatsRepository>();
+builder.Services.AddScoped<IDeviceTokenRepository, DeviceTokenRepository>();
 
 // ── Servicios (Scoped) ────────────────────────────────────────────────────────
 builder.Services.AddScoped<IAlertsService, AlertsService>();
 builder.Services.AddScoped<IReportsService, ReportsService>();
 builder.Services.AddScoped<IStatsService, StatsService>();
 builder.Services.AddScoped<IPhotoStorageService, PhotoStorageService>();
+builder.Services.AddScoped<IFcmService, FcmService>();
 builder.Services.AddScoped<DataSeeder>();
 
 // ── Controllers + JSON ────────────────────────────────────────────────────────
@@ -82,8 +106,9 @@ builder.Services.AddCors(opts =>
         policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
 });
 
-// ── Background Service ────────────────────────────────────────────────────────
+// ── Background Services ───────────────────────────────────────────────────────
 builder.Services.AddHostedService<HeatmapSyncService>();
+builder.Services.AddHostedService<InfoReportSyncService>();
 
 WebApplication app = builder.Build();
 

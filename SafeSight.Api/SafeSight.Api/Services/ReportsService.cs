@@ -45,6 +45,7 @@ public class ReportsService : IReportsService
         {
             Id = Guid.NewGuid(),
             AlertId = request.AlertId,
+            CitizenId = request.CitizenId,
             Type = ReportType.Info,
             Latitude = request.Latitude,
             Longitude = request.Longitude,

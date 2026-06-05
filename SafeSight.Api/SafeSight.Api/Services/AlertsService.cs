@@ -11,12 +11,18 @@ public class AlertsService : IAlertsService
     private readonly IAlertsRepository _alertsRepository;
     private readonly IStatsRepository _statsRepository;
     private readonly IPhotoStorageService _photoStorageService;
+    private readonly IFcmService _fcmService;
 
-    public AlertsService(IAlertsRepository alertsRepository, IStatsRepository statsRepository, IPhotoStorageService photoStorageService)
+    public AlertsService(
+        IAlertsRepository alertsRepository,
+        IStatsRepository statsRepository,
+        IPhotoStorageService photoStorageService,
+        IFcmService fcmService)
     {
         _alertsRepository = alertsRepository;
         _statsRepository = statsRepository;
         _photoStorageService = photoStorageService;
+        _fcmService = fcmService;
     }
 
     public async Task<PagedResponse<AlertResponse>> GetActiveAsync(int page, int pageSize)
@@ -91,7 +97,12 @@ public class AlertsService : IAlertsService
         };
 
         Alert created = await _alertsRepository.CreateAsync(alert);
-        return AlertResponse.FromDomain(created);
+        AlertResponse response = AlertResponse.FromDomain(created);
+
+        // Fire-and-forget: no bloqueamos la respuesta si FCM tarda o falla
+        _ = _fcmService.SendNewAlertAsync(response);
+
+        return response;
     }
 
     public async Task<bool> UpdateStatusAsync(string id, UpdateAlertStatusRequest request)

@@ -22,17 +22,16 @@ public class ReportsRepository : IReportsRepository
     {
         string timeBucket = GetTimeBucket(report.ReportedAt);
 
-        // Dual-write: escribe en la tabla principal (por alerta) y en la tabla de sync (por tiempo).
         // TODO: en producción usar PreparedStatement para mejor performance.
         SimpleStatement mainInsert = new SimpleStatement(
             $"INSERT INTO {_keyspace}.citizen_reports " +
-            "(alert_id, time_bucket, reported_at, id, type, latitude, longitude, description, photo_url) " +
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "(alert_id, time_bucket, reported_at, id, type, citizen_id, latitude, longitude, description, photo_url) " +
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             report.AlertId, timeBucket, report.ReportedAt, report.Id,
-            (int)report.Type, report.Latitude, report.Longitude,
+            (int)report.Type, report.CitizenId, report.Latitude, report.Longitude,
             report.Description, report.PhotoUrl);
 
-        SimpleStatement syncInsert = new SimpleStatement(
+        SimpleStatement heatmapSyncInsert = new SimpleStatement(
             $"INSERT INTO {_keyspace}.citizen_reports_by_time " +
             "(time_bucket, reported_at, alert_id, id, type, latitude, longitude) " +
             "VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -40,7 +39,20 @@ public class ReportsRepository : IReportsRepository
             (int)report.Type, report.Latitude, report.Longitude);
 
         await _session.ExecuteAsync(mainInsert);
-        await _session.ExecuteAsync(syncInsert);
+        await _session.ExecuteAsync(heatmapSyncInsert);
+
+        if (report.Type == ReportType.Info)
+        {
+            SimpleStatement infoSyncInsert = new SimpleStatement(
+                $"INSERT INTO {_keyspace}.info_reports_sync " +
+                "(time_bucket, reported_at, id, alert_id, citizen_id, latitude, longitude, description, photo_url) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                timeBucket, report.ReportedAt, report.Id, report.AlertId,
+                report.CitizenId, report.Latitude, report.Longitude,
+                report.Description, report.PhotoUrl);
+
+            await _session.ExecuteAsync(infoSyncInsert);
+        }
     }
 
     public async Task<PagedResponse<CitizenReport>> GetByAlertAsync(string alertId, int page, int pageSize)
