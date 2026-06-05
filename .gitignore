@@ -32,3 +32,4 @@ appsettings.*.local.json
 SafeSight.Api/SafeSight.Api/wwwroot/photos/*.jpg
 SafeSight.Api/SafeSight.Api/wwwroot/photos/*.jpeg
 SafeSight.Api/SafeSight.Api/wwwroot/photos/*.png
+SafeSight.Api/SafeSight.Api/firebase-adminsdk.json
