@@ -20,6 +20,7 @@ public class MongoConfiguration
         await EnsureAlertIndexesAsync();
         await EnsureHeatmapIndexesAsync();
         await EnsureInfoReportsIndexesAsync();
+        await EnsureAdminActivityIndexesAsync();
         _logger.LogInformation("MongoDB indexes verified");
     }
 
@@ -52,6 +53,15 @@ public class MongoConfiguration
         IndexKeysDefinition<HeatmapCell> alertIndex = Builders<HeatmapCell>.IndexKeys.Ascending("AlertId");
         await collection.Indexes.CreateOneAsync(
             new CreateIndexModel<HeatmapCell>(alertIndex, new CreateIndexOptions { Name = "idx_heatmap_alertid" }));
+    }
+
+    private async Task EnsureAdminActivityIndexesAsync()
+    {
+        IMongoCollection<AdminActivity> collection = _database.GetCollection<AdminActivity>("admin_activity");
+
+        IndexKeysDefinition<AdminActivity> timestampIndex = Builders<AdminActivity>.IndexKeys.Descending("Timestamp");
+        await collection.Indexes.CreateOneAsync(
+            new CreateIndexModel<AdminActivity>(timestampIndex, new CreateIndexOptions { Name = "idx_adminactivity_timestamp" }));
     }
 
     private async Task EnsureInfoReportsIndexesAsync()

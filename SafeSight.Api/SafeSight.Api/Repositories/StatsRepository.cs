@@ -23,10 +23,7 @@ public class StatsRepository : IStatsRepository
         int resolvedAlerts = await _alertsRepository.CountByStatusAsync(AlertStatus.Resolved);
         int cancelledAlerts = await _alertsRepository.CountByStatusAsync(AlertStatus.Cancelled);
 
-        // Lee reportes del último día como aproximación rápida para el overview del MVP.
-        // En producción: mantener contadores en MongoDB actualizados por el sync service.
-        DateTime since = DateTime.UtcNow.AddHours(-24);
-        List<CitizenReport> recentReports = await _reportsRepository.GetReportsSinceAsync(since, DateTime.UtcNow);
+        List<CitizenReport> recentReports = await _reportsRepository.GetReportsSinceAsync(DateTime.MinValue, DateTime.UtcNow);
 
         return new StatsOverviewResponse
         {

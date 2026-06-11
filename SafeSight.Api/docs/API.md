@@ -1,49 +1,98 @@
-# SafeSight API — Documentación de Endpoints
+# SafeSight API — Documentación
 
-Todas las respuestas usan el wrapper `ApiResult<T>`:
+**Base URL:** `http://10.100.40.111:5121`  
+**Formato:** JSON (excepto donde se indica `multipart/form-data`)
 
-```json
-{ "success": true, "data": { ... }, "error": null }
-{ "success": false, "data": null, "error": "Mensaje de error." }
-```
-
-Base URL: `http://localhost:5121`
+> La API corre en la PC con IP `10.100.40.111`. Cualquier dispositivo en la misma red puede consumirla usando esa dirección. Si la IP cambia (DHCP), actualizá esta URL.
 
 ---
 
-## Alertas
+## Estructura de respuesta
 
-### GET /api/alerts
+Todos los endpoints devuelven el mismo wrapper:
 
-Lista paginada de alertas activas.
+```json
+{
+  "success": true,
+  "data": { ... },
+  "error": null
+}
+```
 
-**Query params:** `page` (default 1), `pageSize` (default 20, máx 100)
+En caso de error:
+```json
+{
+  "success": false,
+  "data": null,
+  "error": "Descripción del error."
+}
+```
 
-**Respuesta 200:**
+### Respuesta paginada
+
+Cuando `data` es una lista paginada:
+
+```json
+{
+  "success": true,
+  "data": {
+    "items": [ ... ],
+    "page": 1,
+    "pageSize": 20,
+    "totalItems": 45,
+    "totalPages": 3
+  }
+}
+```
+
+---
+
+## Enums
+
+| Tipo | Valores |
+|---|---|
+| `AlertStatus` | `"Active"`, `"Resolved"`, `"Cancelled"` |
+| `ReportType` | `0` = Awareness, `1` = Info |
+
+---
+
+## Alertas — `/api/alerts`
+
+### GET `/api/alerts`
+Lista todas las alertas activas, paginadas.
+
+**Query params:**
+| Param | Tipo | Default | Descripción |
+|---|---|---|---|
+| `page` | int | 1 | Número de página |
+| `pageSize` | int | 20 | Resultados por página (máx 100) |
+
+**Respuesta `200`:** `PagedResponse<AlertResponse>`
+
 ```json
 {
   "success": true,
   "data": {
     "items": [
       {
-        "id": "...",
-        "firstName": "Valentina",
-        "lastName": "Ríos",
-        "age": 9,
-        "physicalDescription": "...",
-        "photoUrl": "https://i.pravatar.cc/300?img=47",
-        "situation": "...",
-        "lastKnownLatitude": -34.6037,
-        "lastKnownLongitude": -58.3816,
-        "disappearanceDate": "2026-05-25T00:00:00Z",
+        "id": "abc123",
+        "firstName": "Juan",
+        "lastName": "Pérez",
+        "age": 35,
+        "physicalDescription": "Cabello castaño, 1.75m",
+        "photoUrl": "/photos/uuid.jpg",
+        "situation": "Descripción de la situación",
+        "lastKnownLatitude": -34.603722,
+        "lastKnownLongitude": -58.381592,
+        "disappearanceDate": "2026-06-01T10:00:00Z",
         "emitterId": 1,
-        "emittedAt": "2026-05-25T01:00:00Z",
+        "emittedAt": "2026-06-01T12:00:00Z",
         "status": "Active"
       }
     ],
     "page": 1,
     "pageSize": 20,
-    "totalItems": 4,
+    "totalItems": 5,
     "totalPages": 1
   }
 }
@@ -51,206 +100,290 @@ Lista paginada de alertas activas.
 
 ---
 
-### GET /api/alerts/{id}
+### GET `/api/alerts/{id}`
+Obtiene una alerta por su ID.
 
-Detalle de una alerta por ID.
+**Path params:** `id` (string)
 
-**Respuesta 200:** `ApiResult<AlertResponse>`  
-**Respuesta 404:** Alerta no encontrada.
+**Respuesta `200`:** `AlertResponse` (mismo objeto del listado)  
+**Respuesta `404`:** `{ "success": false, "error": "Alerta no encontrada." }`
 
 ---
 
-### GET /api/alerts/{id}/metrics
+### GET `/api/alerts/{id}/metrics`
+Métricas de participación ciudadana para una alerta.
 
-Métricas calculadas desde Cassandra para una alerta.
+**Path params:** `id` (string)
 
-**Respuesta 200:**
+**Respuesta `200`:**
 ```json
 {
   "success": true,
   "data": {
-    "alertId": "...",
-    "totalAwareness": 52,
-    "totalInfoReports": 18,
-    "geographicReachKm": 3.47
+    "alertId": "abc123",
+    "totalAwareness": 120,
+    "totalInfoReports": 15,
+    "geographicReachKm": 4.7
+  }
+}
+```
+
+**Respuesta `404`:** Alerta no encontrada.
+
+---
+
+### GET `/api/alerts/by-emitter/{emitterId}`
+Lista las alertas creadas por un emisor específico.
+
+**Path params:** `emitterId` (int)  
+**Query params:** `page`, `pageSize` (igual que GET `/api/alerts`)
+
+**Respuesta `200`:** `PagedResponse<AlertResponse>`
+
+---
+
+### POST `/api/alerts`
+Crea una nueva alerta. Requiere `multipart/form-data`.
+
+**Body (`multipart/form-data`):**
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `firstName` | string | Sí | Nombre de la persona |
+| `lastName` | string | Sí | Apellido |
+| `age` | int | Sí | Edad |
+| `physicalDescription` | string | Sí | Descripción física |
+| `situation` | string | Sí | Descripción de la situación |
+| `latitude` | double | Sí | Latitud del último lugar conocido |
+| `longitude` | double | Sí | Longitud del último lugar conocido |
+| `disappearanceDate` | datetime | Sí | Fecha de desaparición (ISO 8601) |
+| `emitterId` | int | Sí | ID del emisor (1=ciudadano, 2=entidad) |
+| `photo` | file | No | Foto de la persona (jpg/png, máx 5 MB) |
+
+**Respuesta `201`:** `AlertResponse` con el objeto creado.
+
+---
+
+### PATCH `/api/alerts/{id}/status`
+Actualiza el estado de una alerta.
+
+**Path params:** `id` (string)
+
+**Body (JSON):**
+```json
+{
+  "status": "Resolved"
+}
+```
+Valores válidos: `"Active"`, `"Resolved"`, `"Cancelled"`
+
+**Respuesta `200`:** `{ "success": true, "data": true }`  
+**Respuesta `404`:** Alerta no encontrada.
+
+---
+
+## Reportes ciudadanos — `/api/reports`
+
+### POST `/api/reports/awareness`
+El ciudadano reporta que está enterado de la alerta, enviando solo su ubicación.
+
+**Body (JSON):**
+```json
+{
+  "alertId": "abc123",
+  "latitude": -34.603722,
+  "longitude": -58.381592,
+  "reportedAt": "2026-06-07T14:30:00Z"
+}
+```
+
+| Campo | Tipo | Requerido |
+|---|---|---|
+| `alertId` | string | Sí |
+| `latitude` | double | Sí (-90 a 90) |
+| `longitude` | double | Sí (-180 a 180) |
+| `reportedAt` | datetime | Sí |
+
+**Respuesta `200`:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "uuid",
+    "alertId": "abc123",
+    "type": 0,
+    "latitude": -34.603722,
+    "longitude": -58.381592,
+    "reportedAt": "2026-06-07T14:30:00Z"
   }
 }
 ```
 
 ---
 
-### GET /api/alerts/by-emitter/{emitterId}
+### POST `/api/reports/info`
+El ciudadano reporta información con descripción y foto opcional. Requiere `multipart/form-data`.
 
-Alertas de un emisor específico (1=ciudadano, 2=entidad).
+**Body (`multipart/form-data`):**
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `alertId` | string | Sí | ID de la alerta |
+| `citizenId` | string | Sí | ID del ciudadano |
+| `latitude` | double | Sí | Latitud (-90 a 90) |
+| `longitude` | double | Sí | Longitud (-180 a 180) |
+| `description` | string | Sí | Descripción (máx 1000 caracteres) |
+| `reportedAt` | datetime | Sí | Fecha del reporte (ISO 8601) |
+| `photo` | file | No | Foto (jpg/png, máx 5 MB) |
 
-**Query params:** `page`, `pageSize`  
-**Respuesta 200:** `ApiResult<PagedResponse<AlertResponse>>`
-
----
-
-### POST /api/alerts
-
-Crear una nueva alerta. Content-Type: `multipart/form-data`.
-
-**Body fields:**
-
-| Campo | Tipo | Requerido |
-|-------|------|-----------|
-| firstName | string | Sí |
-| lastName | string | Sí |
-| age | int | Sí |
-| physicalDescription | string | Sí |
-| situation | string | Sí |
-| latitude | double | Sí |
-| longitude | double | Sí |
-| disappearanceDate | datetime | Sí |
-| emitterId | int (1 o 2) | Sí |
-| photo | file (jpg/png) | No |
-
-**Respuesta 201:** `ApiResult<AlertResponse>` con el objeto creado.
-
----
-
-### PATCH /api/alerts/{id}/status
-
-Cambiar el estado de una alerta.
-
-**Body:**
-```json
-{ "status": "Resolved" }
-```
-
-Valores posibles: `Active`, `Resolved`, `Cancelled`
-
-**Respuesta 200:** `ApiResult<bool>`  
-**Respuesta 404:** Alerta no encontrada.
-
----
-
-## Reportes Ciudadanos
-
-### POST /api/reports/awareness
-
-Registrar un "Enterado" (punto de alcance de alerta).
-
-**Body JSON:**
-```json
-{
-  "alertId": "...",
-  "latitude": -34.61,
-  "longitude": -58.39,
-  "reportedAt": "2026-05-27T14:30:00Z"
-}
-```
-
-**Respuesta 200:** `ApiResult<CitizenReport>`
-
----
-
-### POST /api/reports/info
-
-Registrar "Tengo información" (punto de interés con evidencia). Content-Type: `multipart/form-data`.
-
-**Body fields:**
-
-| Campo | Tipo | Requerido |
-|-------|------|-----------|
-| alertId | string | Sí |
-| latitude | double | Sí |
-| longitude | double | Sí |
-| description | string | Sí |
-| reportedAt | datetime | Sí |
-| photo | file (jpg/png) | No |
-
-**Respuesta 200:** `ApiResult<CitizenReport>`
-
----
-
-### GET /api/reports/by-alert/{alertId}
-
-Reportes paginados de una alerta (últimos 30 días).
-
-**Query params:** `page` (default 1), `pageSize` (default 50, máx 100)
-
-**Respuesta 200:** `ApiResult<PagedResponse<CitizenReport>>`
-
----
-
-## Estadísticas
-
-### GET /api/stats/overview
-
-Estadísticas globales para administración.
-
-**Respuesta 200:**
+**Respuesta `200`:**
 ```json
 {
   "success": true,
   "data": {
-    "totalAlerts": 4,
-    "activeAlerts": 4,
-    "resolvedAlerts": 0,
-    "cancelledAlerts": 0,
-    "totalReports": 237,
-    "totalAwarenessReports": 196,
-    "totalInfoReports": 41
+    "id": "uuid",
+    "alertId": "abc123",
+    "citizenId": "citizen-001",
+    "type": 1,
+    "latitude": -34.603722,
+    "longitude": -58.381592,
+    "description": "Vi a una persona...",
+    "photoUrl": "/photos/uuid.jpg",
+    "reportedAt": "2026-06-07T14:30:00Z"
   }
 }
 ```
 
 ---
 
-### GET /api/stats/heatmap
+### GET `/api/reports/info/by-alert/{alertId}`
+Lista todos los reportes de tipo Info (con descripción y foto) para una alerta, ordenados del más nuevo al más viejo. Lee desde MongoDB.
 
-Celdas de heatmap pre-agregadas. Siempre se leen de la colección `heatmap_cells` de MongoDB (nunca se calculan al vuelo).
+> Los reportes aparecen con hasta ~15 segundos de retraso desde que se crean (consistencia eventual).
 
-**Query params:** `alertId` (opcional — si se omite, devuelve el heatmap global)
+**Path params:** `alertId` (string)  
+**Query params:** `page`, `pageSize` (máx 100, default 50)
 
-**Respuesta 200:**
+**Respuesta `200`:** `PagedResponse<InfoReportDocument>`
+
 ```json
 {
   "success": true,
   "data": {
-    "alertId": "...",
+    "items": [
+      {
+        "id": "uuid",
+        "alertId": "abc123",
+        "citizenId": "citizen-001",
+        "latitude": -34.603722,
+        "longitude": -58.381592,
+        "description": "Vi a una persona con campera roja...",
+        "photoUrl": "/photos/uuid.jpg",
+        "reportedAt": "2026-06-07T14:30:00Z"
+      }
+    ],
+    "page": 1,
+    "pageSize": 50,
+    "totalItems": 8,
+    "totalPages": 1
+  }
+}
+```
+
+---
+
+### GET `/api/reports/by-alert/{alertId}`
+Lista todos los reportes (Awareness + Info) para una alerta. Lee desde Cassandra.
+
+**Path params:** `alertId` (string)  
+**Query params:** `page`, `pageSize` (máx 100, default 50)
+
+**Respuesta `200`:** `PagedResponse<CitizenReport>` (incluye ambos tipos)
+
+---
+
+## Estadísticas — `/api/stats`
+
+### GET `/api/stats/overview`
+Resumen general del sistema.
+
+**Respuesta `200`:**
+```json
+{
+  "success": true,
+  "data": {
+    "totalAlerts": 10,
+    "activeAlerts": 6,
+    "resolvedAlerts": 3,
+    "cancelledAlerts": 1,
+    "totalReports": 540,
+    "totalAwarenessReports": 480,
+    "totalInfoReports": 60
+  }
+}
+```
+
+---
+
+### GET `/api/stats/heatmap`
+Datos del mapa de calor para renderizar en el mapa.
+
+**Query params:**
+| Param | Tipo | Descripción |
+|---|---|---|
+| `alertId` | string | Opcional. Si se omite, devuelve el heatmap global. |
+
+**Respuesta `200`:**
+```json
+{
+  "success": true,
+  "data": {
+    "alertId": "abc123",
     "cells": [
       {
-        "centerLatitude": -34.60,
-        "centerLongitude": -58.38,
-        "awarenessCount": 8,
-        "infoCount": 3,
-        "weightedIntensity": 17.0,
-        "lastUpdated": "2026-05-27T14:30:15Z"
+        "centerLatitude": -34.603722,
+        "centerLongitude": -58.381592,
+        "awarenessCount": 45,
+        "infoCount": 8,
+        "weightedIntensity": 69.0,
+        "lastUpdated": "2026-06-07T14:15:00Z"
       }
     ]
   }
 }
 ```
 
-`weightedIntensity = infoCount × 3 + awarenessCount × 1`
+> `weightedIntensity` = `(infoCount × 3) + (awarenessCount × 1)`
 
 ---
 
-## Notificaciones
+## Notificaciones — `/api/notifications`
 
-### POST /api/notifications/register-token
+### POST `/api/notifications/register-token`
+Registra o actualiza un token FCM de un dispositivo para recibir notificaciones push.
 
-Registrar un token FCM para notificaciones push.
-
-**Body JSON:**
+**Body (JSON):**
 ```json
-{ "token": "fcm_token_...", "role": "citizen" }
+{
+  "token": "fcm-token-string",
+  "role": "citizen"
+}
 ```
 
-**Respuesta 200:** `ApiResult<bool>` con `data: true`
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `token` | string | Sí | Token FCM del dispositivo |
+| `role` | string | Sí | Rol del dispositivo (ej: `"citizen"`, `"entity"`) |
+
+**Respuesta `200`:** `{ "success": true, "data": true }`  
+**Respuesta `400`:** Token inválido.
 
 ---
 
-## Códigos de estado
+## Archivos estáticos
 
-| Código | Significado |
-|--------|-------------|
-| 200 | OK |
-| 201 | Creado (POST /api/alerts) |
-| 400 | Validación fallida |
-| 404 | Recurso no encontrado |
-| 500 | Error interno del servidor |
+Las fotos se sirven directamente como archivos estáticos:
+
+```
+GET http://10.100.40.111:5121/photos/<nombre-archivo>.jpg
+```
+
+La URL de la foto viene en los campos `photoUrl` de las respuestas de alertas y reportes.

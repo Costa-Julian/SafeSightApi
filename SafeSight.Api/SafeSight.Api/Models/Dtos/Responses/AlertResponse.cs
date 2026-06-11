@@ -17,6 +17,7 @@ public class AlertResponse
     public int EmitterId { get; set; }
     public DateTime EmittedAt { get; set; }
     public AlertStatus Status { get; set; }
+    public DateTime? ResolvedAt { get; set; }
 
     public static AlertResponse FromDomain(Alert alert) => new()
     {
@@ -32,6 +33,7 @@ public class AlertResponse
         DisappearanceDate = alert.DisappearanceDate,
         EmitterId = alert.EmitterId,
         EmittedAt = alert.EmittedAt,
-        Status = alert.Status
+        Status = alert.Status,
+        ResolvedAt = alert.ResolvedAt
     };
 }

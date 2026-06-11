@@ -14,4 +14,5 @@ public class Alert
     public int EmitterId { get; set; }
     public DateTime EmittedAt { get; set; }
     public AlertStatus Status { get; set; }
+    public DateTime? ResolvedAt { get; set; }
 }

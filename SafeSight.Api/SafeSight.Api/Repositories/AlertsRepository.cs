@@ -61,8 +61,18 @@ public class AlertsRepository : IAlertsRepository
         if (alert == null) return false;
 
         alert.Status = status;
+        if (status == AlertStatus.Resolved || status == AlertStatus.Cancelled)
+            alert.ResolvedAt = DateTime.UtcNow;
+
         await _context.SaveChangesAsync();
         return true;
+    }
+
+    public async Task<List<Alert>> GetAllAsync()
+    {
+        return await _context.Alerts
+            .OrderByDescending(a => a.EmittedAt)
+            .ToListAsync();
     }
 
     public async Task<int> CountActiveAsync()

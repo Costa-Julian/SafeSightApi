@@ -1,22 +1,22 @@
 {
   "info": {
     "name": "SafeSight API",
-    "_postman_id": "safesight-api-collection-v1",
+    "_postman_id": "safesight-api-collection-v2",
     "description": "Colección completa de endpoints para la SafeSight API — sistema de alertas de personas desaparecidas con arquitectura dual NoSQL (MongoDB + Cassandra).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     {
       "key": "baseUrl",
-      "value": "http://localhost:5121",
+      "value": "http://192.168.0.16:5121",
       "type": "string",
-      "description": "URL base de la API"
+      "description": "URL base de la API. Cambiar si la IP del servidor cambia (DHCP)."
     },
     {
       "key": "alertId",
       "value": "",
       "type": "string",
-      "description": "ID de alerta para reutilizar entre requests"
+      "description": "ID de alerta. Se auto-completa al ejecutar 'Crear nueva alerta'."
     }
   ],
   "item": [
@@ -74,7 +74,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "alerts", "{{alertId}}", "metrics"]
             },
-            "description": "Retorna métricas calculadas para una alerta: total de avisos, reportes de información y alcance geográfico en km."
+            "description": "Retorna métricas calculadas para una alerta: total de avisos, reportes de información y alcance geográfico máximo en km desde el último punto conocido."
           },
           "response": []
         },
@@ -171,7 +171,7 @@
                 },
                 {
                   "key": "disappearanceDate",
-                  "value": "2026-05-26T08:00:00",
+                  "value": "2026-06-05T08:00:00",
                   "type": "text",
                   "description": "Fecha y hora de desaparición (ISO 8601)"
                 },
@@ -195,7 +195,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "alerts"]
             },
-            "description": "Crea una nueva alerta de persona desaparecida. Acepta multipart/form-data para permitir adjuntar foto. El ID generado se guarda automáticamente en la variable `alertId`."
+            "description": "Crea una nueva alerta de persona desaparecida. Acepta multipart/form-data para adjuntar foto. El ID generado se guarda automáticamente en la variable `alertId`."
           },
           "response": []
         },
@@ -211,7 +211,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"status\": 1\n}",
+              "raw": "{\n  \"status\": \"Resolved\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -223,7 +223,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "alerts", "{{alertId}}", "status"]
             },
-            "description": "Actualiza el estado de una alerta. Valores posibles para `status`: 0 = Active, 1 = Resolved, 2 = Cancelled."
+            "description": "Actualiza el estado de una alerta. Valores posibles para `status` (string): \"Active\", \"Resolved\", \"Cancelled\"."
           },
           "response": []
         }
@@ -231,7 +231,7 @@
     },
     {
       "name": "Reports",
-      "description": "Gestión de reportes ciudadanos almacenados en Cassandra. Soporta dos tipos: Awareness (avistamiento) e Info (información con detalle).",
+      "description": "Gestión de reportes ciudadanos. Los reportes de awareness se almacenan en Cassandra. Los de tipo info también se sincronizan a MongoDB cada ~15 segundos.",
       "item": [
         {
           "name": "Crear reporte de awareness (avistamiento)",
@@ -245,7 +245,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"alertId\": \"{{alertId}}\",\n  \"latitude\": -34.6045,\n  \"longitude\": -58.3850,\n  \"reportedAt\": \"2026-05-28T14:30:00\"\n}",
+              "raw": "{\n  \"alertId\": \"{{alertId}}\",\n  \"latitude\": -34.6045,\n  \"longitude\": -58.3850,\n  \"reportedAt\": \"2026-06-10T14:30:00\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -257,12 +257,12 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "reports", "awareness"]
             },
-            "description": "Registra un avistamiento ciudadano de la persona desaparecida. Solo requiere ubicación y timestamp — es el reporte más liviano y de alta frecuencia. Se almacena en Cassandra."
+            "description": "Registra un avistamiento ciudadano. Solo requiere ubicación y timestamp. Reporte liviano y de alta frecuencia. Se almacena en Cassandra (citizen_reports + citizen_reports_by_time)."
           },
           "response": []
         },
         {
-          "name": "Crear reporte de información",
+          "name": "Crear reporte de información (con foto)",
           "request": {
             "method": "POST",
             "header": [],
@@ -274,6 +274,12 @@
                   "value": "{{alertId}}",
                   "type": "text",
                   "description": "ID de la alerta asociada"
+                },
+                {
+                  "key": "citizenId",
+                  "value": "citizen-001",
+                  "type": "text",
+                  "description": "ID del ciudadano informante (generado en la app Android)"
                 },
                 {
                   "key": "latitude",
@@ -295,7 +301,7 @@
                 },
                 {
                   "key": "reportedAt",
-                  "value": "2026-05-28T15:00:00",
+                  "value": "2026-06-10T15:00:00",
                   "type": "text",
                   "description": "Fecha y hora del reporte (ISO 8601)"
                 },
@@ -303,7 +309,7 @@
                   "key": "photo",
                   "type": "file",
                   "src": [],
-                  "description": "Foto evidencia (opcional)",
+                  "description": "Foto evidencia (opcional, máximo 5 MB)",
                   "disabled": true
                 }
               ]
@@ -313,12 +319,12 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "reports", "info"]
             },
-            "description": "Registra un reporte detallado con descripción textual y foto opcional. Más pesado que awareness pero aporta más información contextual. Se almacena en Cassandra."
+            "description": "Registra un reporte detallado con citizenId, descripción textual y foto opcional. Se escribe en Cassandra y se sincroniza a MongoDB info_reports en ~15 segundos."
           },
           "response": []
         },
         {
-          "name": "Obtener reportes de una alerta (paginado)",
+          "name": "Obtener reportes de una alerta — Cassandra (paginado)",
           "request": {
             "method": "GET",
             "header": [],
@@ -339,7 +345,33 @@
                 }
               ]
             },
-            "description": "Retorna todos los reportes ciudadanos asociados a una alerta específica, ordenados cronológicamente."
+            "description": "Retorna todos los reportes (awareness + info) de una alerta desde Cassandra, ordenados cronológicamente."
+          },
+          "response": []
+        },
+        {
+          "name": "Obtener reportes de información — MongoDB (paginado)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reports/info/by-alert/{{alertId}}?page=1&pageSize=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "reports", "info", "by-alert", "{{alertId}}"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Número de página (default: 1)"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "description": "Tamaño de página (default: 20, máximo: 100)"
+                }
+              ]
+            },
+            "description": "Retorna solo reportes de tipo Info (con descripción y foto) de una alerta desde MongoDB, ordenados del más nuevo al más viejo. Usado por la app mobile para mostrar el detalle de avisos con foto."
           },
           "response": []
         }
@@ -359,7 +391,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "stats", "overview"]
             },
-            "description": "Retorna un resumen global del sistema: total de alertas por estado, total de reportes por tipo."
+            "description": "Retorna un resumen global: total de alertas por estado (Active/Resolved/Cancelled) y total de reportes por tipo (Awareness/Info)."
           },
           "response": []
         },
@@ -373,7 +405,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "stats", "heatmap"]
             },
-            "description": "Retorna todas las celdas del heatmap global (todas las alertas combinadas). Cada celda representa una zona geográfica de ~1 km² con conteos de awareness e info."
+            "description": "Retorna todas las celdas del heatmap global (todas las alertas combinadas). Cada celda representa una zona ~1 km² con awarenessCount, infoCount y weightedIntensity = (info × 3) + (awareness × 1)."
           },
           "response": []
         },
@@ -394,7 +426,83 @@
                 }
               ]
             },
-            "description": "Retorna las celdas del heatmap filtradas para una alerta específica. Útil para visualizar la distribución geográfica de reportes de una sola persona."
+            "description": "Retorna las celdas del heatmap filtradas para una alerta específica."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "description": "Panel de administración. Endpoints para el dashboard operativo: estadísticas, actividad reciente, listado completo de alertas y reportes.",
+      "item": [
+        {
+          "name": "Dashboard completo",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/dashboard",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "dashboard"]
+            },
+            "description": "Retorna en una sola llamada: stats de overview, alertas sin resolver, reportes recientes, feed de actividad reciente y datos de heatmap global. Usa Task.WhenAll internamente para fetching paralelo."
+          },
+          "response": []
+        },
+        {
+          "name": "Feed de actividad reciente",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/activity?limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "activity"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Cantidad de eventos a retornar (default: 10, máximo: 100)"
+                }
+              ]
+            },
+            "description": "Retorna los últimos N eventos del sistema ordenados por timestamp descendente. Kinds posibles: AlertCreated, ReportSubmitted, StatusChanged, System."
+          },
+          "response": []
+        },
+        {
+          "name": "Todas las alertas (sin paginar)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/alerts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "alerts"]
+            },
+            "description": "Retorna todas las alertas del sistema sin distinción de estado (Active, Resolved, Cancelled), ordenadas por EmittedAt descendente. Sin paginación — pensado para el panel admin."
+          },
+          "response": []
+        },
+        {
+          "name": "Todos los reportes (tabla admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/reports?limit=1000",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "reports"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "1000",
+                  "description": "Cantidad máxima de reportes a retornar (default: 500, máximo: 5000)"
+                }
+              ]
+            },
+            "description": "Retorna los últimos N reportes de los últimos 30 días enriquecidos con datos de la alerta: nombre, estado, edad, emitterId y minutesToResolution (solo para alertas resueltas)."
           },
           "response": []
         }
@@ -428,7 +536,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "notifications", "register-token"]
             },
-            "description": "Registra un token FCM de un dispositivo móvil para recibir notificaciones push. En esta versión MVP el token se registra en el log del servidor. Roles: 'citizen', 'entity'."
+            "description": "Registra un token FCM de un dispositivo móvil para recibir notificaciones push cuando se crea una nueva alerta. Roles: \"citizen\", \"entity\"."
           },
           "response": []
         }

@@ -73,6 +73,7 @@ builder.Services.AddScoped<IAlertsRepository, AlertsRepository>();
 builder.Services.AddScoped<IReportsRepository, ReportsRepository>();
 builder.Services.AddScoped<IHeatmapRepository, HeatmapRepository>();
 builder.Services.AddScoped<IInfoReportsMongoRepository, InfoReportsMongoRepository>();
+builder.Services.AddScoped<IAdminActivityRepository, AdminActivityRepository>();
 builder.Services.AddScoped<IStatsRepository, StatsRepository>();
 builder.Services.AddScoped<IDeviceTokenRepository, DeviceTokenRepository>();
 
@@ -80,9 +81,11 @@ builder.Services.AddScoped<IDeviceTokenRepository, DeviceTokenRepository>();
 builder.Services.AddScoped<IAlertsService, AlertsService>();
 builder.Services.AddScoped<IReportsService, ReportsService>();
 builder.Services.AddScoped<IStatsService, StatsService>();
+builder.Services.AddScoped<IAdminService, AdminService>();
 builder.Services.AddScoped<IPhotoStorageService, PhotoStorageService>();
 builder.Services.AddScoped<IFcmService, FcmService>();
 builder.Services.AddScoped<DataSeeder>();
+builder.Services.AddScoped<ActivityMigration>();
 
 // ── Controllers + JSON ────────────────────────────────────────────────────────
 builder.Services.AddControllers()
@@ -187,6 +190,17 @@ using (IServiceScope startupScope = app.Services.CreateScope())
             ILogger<Program> logger = startupScope.ServiceProvider.GetRequiredService<ILogger<Program>>();
             logger.LogError(ex, "Error durante el seed de datos");
         }
+    }
+
+    try
+    {
+        ActivityMigration activityMigration = startupScope.ServiceProvider.GetRequiredService<ActivityMigration>();
+        await activityMigration.RunAsync();
+    }
+    catch (Exception ex)
+    {
+        ILogger<Program> logger = startupScope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "Error durante la migración de actividad");
     }
 }
 

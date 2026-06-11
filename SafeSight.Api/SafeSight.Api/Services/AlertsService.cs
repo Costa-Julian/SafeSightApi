@@ -12,17 +12,20 @@ public class AlertsService : IAlertsService
     private readonly IStatsRepository _statsRepository;
     private readonly IPhotoStorageService _photoStorageService;
     private readonly IFcmService _fcmService;
+    private readonly IAdminActivityRepository _activityRepository;
 
     public AlertsService(
         IAlertsRepository alertsRepository,
         IStatsRepository statsRepository,
         IPhotoStorageService photoStorageService,
-        IFcmService fcmService)
+        IFcmService fcmService,
+        IAdminActivityRepository activityRepository)
     {
         _alertsRepository = alertsRepository;
         _statsRepository = statsRepository;
         _photoStorageService = photoStorageService;
         _fcmService = fcmService;
+        _activityRepository = activityRepository;
     }
 
     public async Task<PagedResponse<AlertResponse>> GetActiveAsync(int page, int pageSize)
@@ -99,14 +102,39 @@ public class AlertsService : IAlertsService
         Alert created = await _alertsRepository.CreateAsync(alert);
         AlertResponse response = AlertResponse.FromDomain(created);
 
-        // Fire-and-forget: no bloqueamos la respuesta si FCM tarda o falla
         _ = _fcmService.SendNewAlertAsync(response);
+
+        await _activityRepository.AddAsync(new AdminActivity
+        {
+            Id = Guid.NewGuid().ToString(),
+            Kind = "AlertCreated",
+            Title = "Nueva alerta emitida",
+            Description = $"Se emitió una alerta para {created.MissingPerson.FirstName} {created.MissingPerson.LastName} ({created.MissingPerson.Age} años).",
+            Timestamp = DateTime.UtcNow,
+            AlertId = created.Id
+        });
 
         return response;
     }
 
     public async Task<bool> UpdateStatusAsync(string id, UpdateAlertStatusRequest request)
     {
-        return await _alertsRepository.UpdateStatusAsync(id, request.Status);
+        bool updated = await _alertsRepository.UpdateStatusAsync(id, request.Status);
+        if (!updated) return false;
+
+        Alert? alert = await _alertsRepository.GetByIdAsync(id);
+        string name = alert != null ? $"{alert.MissingPerson.FirstName} {alert.MissingPerson.LastName}" : id;
+
+        await _activityRepository.AddAsync(new AdminActivity
+        {
+            Id = Guid.NewGuid().ToString(),
+            Kind = "StatusChanged",
+            Title = "Estado de alerta actualizado",
+            Description = $"La alerta de {name} cambió a {request.Status}.",
+            Timestamp = DateTime.UtcNow,
+            AlertId = id
+        });
+
+        return true;
     }
 }
