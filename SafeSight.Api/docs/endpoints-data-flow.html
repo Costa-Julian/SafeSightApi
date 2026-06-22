@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SafeSight API — Endpoints y flujo de datos</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --panel: #171a23;
+    --panel-2: #1e222e;
+    --border: #2a2f3d;
+    --text: #d7dbe4;
+    --muted: #8b93a7;
+    --accent: #6ea8fe;
+    --get: #2f9e6e;
+    --post: #c9831f;
+    --patch: #8a6dd6;
+    --cassandra: #d65a8a;
+    --mongo: #4caf72;
+    --code-bg: #0b0d13;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.55;
+  }
+  .layout { display: flex; }
+  /* Sidebar */
+  nav.sidebar {
+    width: 280px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    padding: 20px 16px;
+  }
+  nav.sidebar h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--muted);
+    margin: 18px 0 8px;
+  }
+  nav.sidebar a {
+    display: block;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 13.5px;
+    padding: 4px 8px;
+    border-radius: 6px;
+  }
+  nav.sidebar a:hover { background: var(--panel-2); color: var(--accent); }
+  nav.sidebar .brand { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+  nav.sidebar .brand small { display:block; font-size: 11px; color: var(--muted); font-weight: 400; }
+  /* Main */
+  main { flex: 1; padding: 32px 48px; max-width: 1100px; }
+  h1 { font-size: 28px; margin: 0 0 6px; }
+  h2.section { font-size: 22px; margin: 48px 0 6px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .lead { color: var(--muted); font-size: 15px; margin-bottom: 8px; }
+  p { margin: 10px 0; }
+  a.anchor { color: inherit; }
+  /* Endpoint card */
+  .endpoint {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin: 22px 0;
+    overflow: hidden;
+  }
+  .endpoint-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    background: var(--panel-2);
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .method {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .05em;
+    padding: 4px 10px;
+    border-radius: 6px;
+    color: #fff;
+    flex-shrink: 0;
+  }
+  .method.get { background: var(--get); }
+  .method.post { background: var(--post); }
+  .method.patch { background: var(--patch); }
+  .path { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14.5px; color: var(--text); }
+  .endpoint-body { padding: 18px; }
+  .purpose { margin: 0 0 14px; }
+  .endpoint-body h4 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    color: var(--muted);
+    margin: 18px 0 8px;
+  }
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin: 6px 0; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  td code { color: var(--accent); }
+  .req-yes { color: #e0b341; font-weight: 600; }
+  .req-no { color: var(--muted); }
+  /* Code blocks */
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    font-size: 13px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    line-height: 1.5;
+    margin: 6px 0;
+  }
+  code { font-family: "SF Mono", Menlo, Consolas, monospace; }
+  /* DB flow badges */
+  .flow { display: flex; flex-direction: column; gap: 10px; margin: 8px 0; }
+  .flow-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-left-width: 3px;
+    border-radius: 8px;
+    padding: 10px 14px;
+  }
+  .flow-row.cassandra { border-left-color: var(--cassandra); }
+  .flow-row.mongo { border-left-color: var(--mongo); }
+  .flow-row.disk { border-left-color: #5b8fb0; }
+  .flow-row.fcm { border-left-color: #b06bd6; }
+  .db-tag {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+    flex-shrink: 0;
+    margin-top: 2px;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+  }
+  .db-tag.cassandra { background: rgba(214,90,138,.18); color: #ef8fb6; }
+  .db-tag.mongo { background: rgba(76,175,114,.18); color: #74d59a; }
+  .db-tag.disk { background: rgba(91,143,176,.18); color: #8fc1e0; }
+  .db-tag.fcm { background: rgba(176,107,214,.18); color: #cf9fe6; }
+  .flow-row .what { flex: 1; }
+  .flow-row .what strong { color: var(--text); }
+  .flow-row .what .tbl { font-family: "SF Mono", Menlo, Consolas, monospace; color: var(--accent); font-size: 12.5px; }
+  .badge-op { font-size: 11px; color: var(--muted); }
+  /* Misc */
+  .note {
+    background: rgba(110,168,254,.08);
+    border: 1px solid rgba(110,168,254,.25);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin: 14px 0;
+    font-size: 13.5px;
+  }
+  .note strong { color: var(--accent); }
+  .pill {
+    display:inline-block;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; margin: 14px 0 0; font-size: 13px; }
+  .legend span { display: flex; align-items: center; gap: 6px; }
+  .dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+  footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12.5px; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <nav class="sidebar">
+    <div class="brand">SafeSight API<small>Endpoints &amp; flujo de datos</small></div>
+    <h2>Conceptos</h2>
+    <a href="#arquitectura">Arquitectura de datos</a>
+    <a href="#wrapper">Envoltorio de respuesta</a>
+    <a href="#enums">Enums</a>
+    <h2>Alertas</h2>
+    <a href="#get-alerts">GET /api/alerts</a>
+    <a href="#get-alert-id">GET /api/alerts/{id}</a>
+    <a href="#get-alert-metrics">GET /api/alerts/{id}/metrics</a>
+    <a href="#get-alerts-emitter">GET /api/alerts/by-emitter/{id}</a>
+    <a href="#post-alerts">POST /api/alerts</a>
+    <a href="#patch-alert-status">PATCH /api/alerts/{id}/status</a>
+    <h2>Reportes ciudadanos</h2>
+    <a href="#post-awareness">POST /api/reports/awareness</a>
+    <a href="#post-info">POST /api/reports/info</a>
+    <a href="#get-reports-alert">GET /api/reports/by-alert/{id}</a>
+    <a href="#get-info-alert">GET /api/reports/info/by-alert/{id}</a>
+    <h2>Estadísticas</h2>
+    <a href="#get-overview">GET /api/stats/overview</a>
+    <a href="#get-heatmap">GET /api/stats/heatmap</a>
+    <h2>Notificaciones</h2>
+    <a href="#post-token">POST /api/notifications/register-token</a>
+    <h2>Administración</h2>
+    <a href="#get-dashboard">GET /api/admin/dashboard</a>
+    <a href="#get-activity">GET /api/admin/activity</a>
+    <a href="#get-admin-alerts">GET /api/admin/alerts</a>
+    <a href="#get-admin-reports">GET /api/admin/reports</a>
+    <h2>Referencia</h2>
+    <a href="#estructuras-cassandra">Estructuras en Cassandra</a>
+    <a href="#estructuras-mongo">Estructuras en MongoDB</a>
+  </nav>
+
+  <main>
+    <h1>SafeSight API — Endpoints y estructura de datos</h1>
+    <p class="lead">Documento orientado al <strong>flujo de datos</strong>: para cada endpoint se detalla qué recibe, para qué sirve, exactamente qué estructura se escribe o lee en cada base, y qué devuelve. El foco está en la forma de los datos que entran y salen de Cassandra y MongoDB, no en el endpoint en sí.</p>
+
+    <div class="legend">
+      <span><span class="dot" style="background:var(--cassandra)"></span> Escritura/lectura en Cassandra</span>
+      <span><span class="dot" style="background:var(--mongo)"></span> Escritura/lectura en MongoDB</span>
+      <span><span class="dot" style="background:#5b8fb0"></span> Disco (fotos)</span>
+      <span><span class="dot" style="background:#b06bd6"></span> Firebase Cloud Messaging</span>
+    </div>
+
+    <!-- ============ ARQUITECTURA ============ -->
+    <h2 class="section" id="arquitectura">Arquitectura de datos (leer primero)</h2>
+    <p>SafeSight usa <strong>persistencia políglota</strong> con dos motores que cumplen roles distintos. Entender cuál base recibe cada escritura es clave para leer este documento.</p>
+    <div class="flow">
+      <div class="flow-row cassandra">
+        <span class="db-tag cassandra">Cassandra</span>
+        <div class="what"><strong>Capa de ingesta (write-optimized).</strong> Fuente de la verdad de los <em>eventos crudos</em>: los reportes ciudadanos. Toda creación de reporte escribe acá. Optimizada para picos masivos de escritura concurrente.</div>
+      </div>
+      <div class="flow-row mongo">
+        <span class="db-tag mongo">MongoDB</span>
+        <div class="what"><strong>Capa de lectura y análisis (read-optimized).</strong> Guarda datos maestros (<span class="tbl">alerts</span>), datos pre-agregados (<span class="tbl">heatmap_cells</span>), reportes Info migrados (<span class="tbl">info_reports</span>), feed de actividad (<span class="tbl">admin_activity</span>) y tokens (<span class="tbl">device_tokens</span>).</div>
+      </div>
+    </div>
+    <div class="note">
+      <strong>Consistencia eventual.</strong> Dos <code>BackgroundService</code> corren cada 15&nbsp;s y migran datos de Cassandra a MongoDB:
+      <br>• <strong>HeatmapSyncService</strong>: lee reportes nuevos de Cassandra, agrupa por geohash (~1&nbsp;km²) y hace upsert en <span class="tbl">heatmap_cells</span> con <code>WeightedIntensity = InfoCount×3 + AwarenessCount×1</code>.
+      <br>• <strong>InfoReportSyncService</strong>: migra filas de <code>info_reports_sync</code> (Cassandra) a la colección <span class="tbl">info_reports</span> (Mongo).
+      <br>Por eso el heatmap y la lista de reportes Info están <strong>~15&nbsp;s atrasados</strong> respecto al evento original. Es una decisión de diseño, no un defecto.
+    </div>
+
+    <!-- ============ WRAPPER ============ -->
+    <h2 class="section" id="wrapper">Envoltorio de respuesta</h2>
+    <p>Todos los endpoints devuelven el mismo envoltorio <code>ApiResult&lt;T&gt;</code>:</p>
+<pre>{ "success": true,  "data": { ... }, "error": null }
+{ "success": false, "data": null,     "error": "Mensaje de error." }</pre>
+    <p>Las listas paginadas devuelven <code>PagedResponse&lt;T&gt;</code> dentro de <code>data</code>:</p>
+<pre>{
+  "items": [ ... ],
+  "page": 1,
+  "pageSize": 20,
+  "totalItems": 45,
+  "totalPages": 3
+}</pre>
+
+    <!-- ============ ENUMS ============ -->
+    <h2 class="section" id="enums">Enums</h2>
+    <table>
+      <tr><th>Tipo</th><th>Valores</th><th>Serialización</th></tr>
+      <tr><td><code>AlertStatus</code></td><td><code>Active</code>, <code>Resolved</code>, <code>Cancelled</code></td><td>String</td></tr>
+      <tr><td><code>ReportType</code></td><td><code>0</code> = Awareness, <code>1</code> = Info</td><td>Entero</td></tr>
+      <tr><td><code>EmitterType</code></td><td><code>1</code> = Ciudadano, <code>2</code> = Entidad (se viaja como <code>emitterId</code> int)</td><td>Entero</td></tr>
+    </table>
+
+    <!-- =================================================================== -->
+    <!-- ALERTAS -->
+    <!-- =================================================================== -->
+    <h2 class="section">Alertas — <code>/api/alerts</code></h2>
+
+    <!-- GET /api/alerts -->
+    <div class="endpoint" id="get-alerts">
+      <div class="endpoint-head"><span class="method get">GET</span><span class="path">/api/alerts</span></div>
+      <div class="endpoint-body">
+        <p class="purpose">Lista las alertas con estado <code>Active</code>, paginadas y ordenadas por fecha de emisión descendente.</p>
+        <h4>Recibe (query)</h4>
+        <table>
+          <tr><th>Param</th><th>Tipo</th><th>Default</th><th>Notas</th></tr>
+          <tr><td><code>page</code></td><td>int</td><td>1</td><td>—</td></tr>
+          <tr><td><code>pageSize</code></td><td>int</td><td>20</td><td>Acotado a 1–100</td></tr>
+        </table>
+        <h4>Acceso a base</h4>
+        <div class="flow"><div class="flow-row mongo"><span class="db-tag mongo">Mongo · lee</span>
+          <div class="what">Consulta <span class="tbl">alerts</span> con <code>Status == Active</code>. <span class="badge-op">EF Core · Skip/Take + Count</span></div></div></div>
+        <h4>Responde — <code>PagedResponse&lt;AlertResponse&gt;</code></h4>
+<pre>{
+  "items": [{
+    "id": "68415a2b1234abcd5678ef90",
+    "firstName": "Juan", "lastName": "Pérez", "age": 35,
+    "physicalDescription": "Cabello castaño, 1.75m",
+    "photoUrl": "/photos/uuid.jpg",
+    "situation": "Descripción de la situación",
+    "lastKnownLatitude": -34.603722, "lastKnownLongitude": -58.381592,
+    "disappearanceDate": "2026-06-01T10:00:00Z",
+    "emitterId": 1, "emittedAt": "2026-06-01T12:00:00Z",
+    "status": "Active", "resolvedAt": null
+  }],
+  "page": 1, "pageSize": 20, "totalItems": 5, "totalPages": 1
+}</pre>
+      </div>
+    </div>
+
+    <!-- GET /api/alerts/{id} -->
+    <div class="endpoint" id="get-alert-id">
+      <div class="endpoint-head"><span class="method get">GET</span><span class="path">/api/alerts/{id}</span></div>
+      <div class="endpoint-body">
+        <p class="purpose">Obtiene una alerta por su ID.</p>
+        <h4>Recibe (path)</h4>
+        <table><tr><th>Param</th><th>Tipo</th></tr><tr><td><code>id</code></td><td>string (ObjectId)</td></tr></table>
+        <h4>Acceso a base</h4>
+        <div class="flow"><div class="flow-row mongo"><span class="db-tag mongo">Mongo · lee</span>
+          <div class="what"><span class="tbl">alerts</span> filtrando por <code>_id</code>.</div></div></div>
+        <h4>Responde</h4>
+        <p><code>AlertResponse</code> (mismo objeto del listado). Si no existe: <span class="pill">404</span> <code>"Alerta no encontrada."</code></p>
+      </div>
+    </div>
+
+    <!-- GET /api/alerts/{id}/metrics -->
+    <div class="endpoint" id="get-alert-metrics">
+      <div class="endpoint-head"><span class="method get">GET</span><span class="path">/api/alerts/{id}/metrics</span></div>
+      <div class="endpoint-body">
+        <p class="purpose">Métricas de participación ciudadana de una alerta: cantidad de avistamientos, reportes con información y alcance geográfico (distancia máxima desde el último lugar conocido hasta cualquier reporte de tipo Info).</p>
+        <h4>Acceso a base</h4>
+        <div class="flow">
+          <div class="flow-row mongo"><span class="db-tag mongo">Mongo · lee</span>
+            <div class="what"><span class="tbl">alerts</span> para obtener la alerta y su <code>LastKnownLocation</code>.</div></div>
+          <div class="flow-row cassandra"><span class="db-tag cassandra">Cassandra · lee</span>
+            <div class="what">Escanea <span class="tbl">citizen_reports_by_time</span> (últimos 30 días de buckets), filtra por <code>alertId</code> en memoria, cuenta por tipo y calcula la distancia con la fórmula de Haversine.</div></div>
+        </div>
+        <h4>Responde — <code>AlertMetricsResponse</code></h4>
+<pre>{
+  "alertId": "abc123",
+  "totalAwareness": 120,
+  "totalInfoReports": 15,
+  "geographicReachKm": 4.7
+}</pre>
+        <p>Si la alerta no existe: <span class="pill">404</span>.</p>
+      </div>
+    </div>
+
+    <!-- GET by-emitter -->
+    <div class="endpoint" id="get-alerts-emitter">
+      <div class="endpoint-head"><span class="method get">GET</span><span class="path">/api/alerts/by-emitter/{emitterId}</span></div>
+      <div class="endpoint-body">
+        <p class="purpose">Lista las alertas creadas por un emisor específico (sin filtrar por estado), paginadas.</p>
+        <h4>Recibe</h4>
+        <table>
+          <tr><th>Param</th><th>Ubicación</th><th>Tipo</th></tr>
+          <tr><td><code>emitterId</code></td><td>path</td><td>int (1=ciudadano, 2=entidad)</td></tr>
+          <tr><td><code>page</code> / <code>pageSize</code></td><td>query</td><td>int (pageSize 1–100, default 20)</td></tr>
+        </table>
+        <h4>Acceso a base</h4>
+        <div class="flow"><div class="flow-row mongo"><span class="db-tag mongo">Mongo · lee</span>
+          <div class="what"><span class="tbl">alerts</span> con <code>EmitterId == emitterId</code>.</div></div></div>
+        <h4>Responde</h4>
+        <p><code>PagedResponse&lt;AlertResponse&gt;</code>.</p>
+      </div>
+    </div>
+
+    <!-- POST /api/alerts -->
+    <div class="endpoint" id="post-alerts">
+      <div class="endpoint-head"><span class="method post">POST</span><span class="path">/api/alerts</span><span class="pill">multipart/form-data</span></div>
+      <div class="endpoint-body">
+        <p class="purpose">Crea una nueva alerta de persona desaparecida. Si trae foto, la guarda en disco; persiste la alerta en MongoDB; dispara una notificación push y registra un evento en el feed de actividad.</p>
+        <h4>Recibe (form-data) — <code>CreateAlertRequest</code></h4>
+        <table>
+          <tr><th>Campo</th><th>Tipo</th><th>Req.</th><th>Validación</th></tr>
+          <tr><td><code>firstName</code></td><td>string</td><td class="req-yes">Sí</td><td>≤ 100 car.</td></tr>
+          <tr><td><code>lastName</code></td><td>string</td><td class="req-yes">Sí</td><td>≤ 100 car.</td></tr>
+          <tr><td><code>age</code></td><td>int</td><td class="req-yes">Sí</td><td>0–120</td></tr>
+          <tr><td><code>physicalDescription</code></td><td>string</td><td class="req-yes">Sí</td><td>≤ 500 car.</td></tr>
+          <tr><td><code>situation</code></td><td>string</td><td class="req-yes">Sí</td><td>≤ 1000 car.</td></tr>
+          <tr><td><code>latitude</code></td><td>double</td><td class="req-yes">Sí</td><td>-90 a 90</td></tr>
+          <tr><td><code>longitude</code></td><td>double</td><td class="req-yes">Sí</td><td>-180 a 180</td></tr>
+          <tr><td><code>disappearanceDate</code></td><td>datetime</td><td class="req-yes">Sí</td><td>No futura (ISO 8601)</td></tr>
+          <tr><td><code>emitterId</code></td><td>int</td><td class="req-yes">Sí</td><td>1 ó 2</td></tr>
+          <tr><td><code>photo</code></td><td>file</td><td class="req-no">No</td><td>jpg/png, ≤ 5 MB</td></tr>
+        </table>
+        <h4>Qué se escribe en las bases</h4>
+        <div class="flow">
+          <div class="flow-row disk"><span class="db-tag disk">Disco</span>
+            <div class="what">Si hay <code>photo</code>: se guarda en <code>wwwroot/photos/{guid}.ext</code> y se obtiene la URL relativa <code>/photos/{guid}.ext</code>. <span class="badge-op">PhotoStorageService</span></div></div>
+          <div class="flow-row mongo"><span class="db-tag mongo">Mongo · inserta</span>
+            <div class="what">Documento en <span class="tbl">alerts</span>. El <code>_id</code> se genera como <code>ObjectId</code>. Estructura embebida (nota: la persona y la ubicación se anidan, distinto del DTO plano de salida):
+<pre>{
+  "_id": "ObjectId generado",
+  "MissingPerson": {
+    "FirstName": "Juan", "LastName": "Pérez", "Age": 35,
+    "PhysicalDescription": "...", "PhotoUrl": "/photos/uuid.jpg"
+  },
+  "Situation": "...",
+  "LastKnownLocation": { "Latitude": -34.60, "Longitude": -58.38 },
+  "DisappearanceDate": "2026-06-01T10:00:00Z",
+  "EmitterId": 1,
+  "EmittedAt": "&lt;DateTime.UtcNow al crear&gt;",
+  "Status": "Active",
+  "ResolvedAt": null
+}</pre></div></div>
+          <div class="flow-row mongo"><span class="db-tag mongo">Mongo · inserta</span>
+            <div class="what">Evento en <span class="tbl">admin_activity</span> con <code>Kind: "AlertCreated"</code>, <code>Title</code> y <code>Description</code> generados, <code>Timestamp</code> y <code>AlertId</code>.</div></div>
+          <div class="flow-row fcm"><span class="db-tag fcm">FCM</span>
+            <div class="what">Notificación push <em>fire-and-forget</em> a todos los <span class="tbl">device_tokens</span> registrados (no bloquea la respuesta).</div></div>
+        </div>
+        <h4>Responde — <span class="pill">201 Created</span></h4>
+        <p><code>AlertResponse</code> con el objeto creado (forma <em>plana</em>, ver GET /api/alerts).</p>
+      </div>
+    </div>
+
+    <!-- PATCH status -->
+    <div class="endpoint" id="patch-alert-status">
+      <div class="endpoint-head"><span class="method patch">PATCH</span><span class="path">/api/alerts/{id}/status</span><span class="pill">application/json</span></div>
+      <div class="endpoint-body">
+        <p class="purpose">Cambia el estado de una alerta. Si el nuevo estado es <code>Resolved</code> o <code>Cancelled</code>, sella <code>ResolvedAt</code> con la hora actual. Registra el cambio en el feed de actividad.</p>
+        <h4>Recibe (JSON) — <code>UpdateAlertStatusRequest</code></h4>
+<pre>{ "status": "Resolved" }   // "Active" | "Resolved" | "Cancelled"</pre>
+        <h4>Qué se escribe en la base</h4>
+        <div class="flow">
+          <div class="flow-row mongo"><span class="db-tag mongo">Mongo · actualiza</span>
+            <div class="what">En <span class="tbl">alerts</span>: setea <code>Status</code>; si es Resolved/Cancelled también <code>ResolvedAt = DateTime.UtcNow</code>.</div></div>
+          <div class="flow-row mongo"><span class="db-tag mongo">Mongo · inserta</span>
+            <div class="what">Evento en <span class="tbl">admin_activity</span> con <code>Kind: "StatusChanged"</code>.</div></div>
+        </div>
+        <h4>Responde</h4>
+        <p><code>{ "success": true, "data": true }</code>. Si la alerta no existe: <span class="pill">404</span>.</p>
+      </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- REPORTES -->
+    <!-- =================================================================== -->
+    <h2 class="section">Reportes ciudadanos — <code>/api/reports</code></h2>
+    <div class="note">Toda creación de reporte escribe <strong>directo en Cassandra</strong> (capa de ingesta). El mismo evento se desnormaliza en varias tablas en una sola operación (<code>ReportsRepository.InsertAsync</code>) para servir distintos patrones de lectura.</div>
+
+    <!-- POST awareness -->
+    <div class="endpoint" id="post-awareness">
+      <div class="endpoint-head"><span class="method post">POST</span><span class="path">/api/reports/awareness</span><span class="pill">application/json</span></div>
+      <div class="endpoint-body">
+        <p class="purpose">El ciudadano indica que está enterado de la alerta enviando solo su ubicación (sin descripción ni foto). Genera un <code>CitizenReport</code> de tipo <code>Awareness</code>.</p>
+        <h4>Recibe (JSON) — <code>AwarenessReportRequest</code></h4>
+        <table>
+          <tr><th>Campo</th><th>Tipo</th><th>Req.</th><th>Validación</th></tr>
+          <tr><td><code>alertId</code></td><td>string</td><td class="req-yes">Sí</td><td>No vacío</td></tr>
+          <tr><td><code>latitude</code></td><td>double</td><td class="req-yes">Sí</td><td>-90 a 90</td></tr>
+          <tr><td><code>longitude</code></td><td>double</td><td class="req-yes">Sí</td><td>-180 a 180</td></tr>
+          <tr><td><code>reportedAt</code></td><td>datetime</td><td class="req-yes">Sí</td><td>Se convierte a UTC</td></tr>
+        </table>
+        <h4>Qué se escribe en Cassandra</h4>
+        <div class="flow">
+          <div class="flow-row cassandra"><span class="db-tag cassandra">Cassandra · inserta</span>
+            <div class="what"><span class="tbl">citizen_reports</span> — fila completa del evento. <code>type = 0</code>, <code>citizen_id / description / photo_url = null</code>. PK <code>((alert_id, time_bucket), reported_at, id)</code>.
+<pre>alert_id    = "abc123"
+time_bucket = "2026-06-07"        // YYYY-MM-DD de reported_at (UTC)
+reported_at = 2026-06-07T14:30:00Z
+id          = &lt;UUID generado&gt;
+type        = 0
+latitude    = -34.603722
+longitude   = -58.381592</pre></div></div>
+          <div class="flow-row cassandra"><span class="db-tag cassandra">Cassandra · inserta</span>
+            <div class="what"><span class="tbl">citizen_reports_by_time</span> — copia desnormalizada para que el HeatmapSyncService escanee por día sin conocer el <code>alert_id</code>. Solo campos del heatmap: <code>time_bucket, reported_at, alert_id, id, type, latitude, longitude</code>.</div></div>
+        </div>
+        <div class="flow"><div class="flow-row mongo"><span class="db-tag mongo">Mongo · inserta</span>
+          <div class="what">Evento en <span class="tbl">admin_activity</span> con <code>Kind: "ReportSubmitted"</code> ("Nuevo reporte de avistamiento").</div></div></div>
+        <h4>Responde — <code>CitizenReport</code></h4>
+<pre>{
+  "id": "uuid", "alertId": "abc123", "type": 0,
+  "latitude": -34.603722, "longitude": -58.381592,
+  "reportedAt": "2026-06-07T14:30:00Z",
+  "citizenId": null, "description": null, "photoUrl": null
+}</pre>
+      </div>
+    </div>
+
+    <!-- POST info -->
+    <div class="endpoint" id="post-info">
+      <div class="endpoint-head"><span class="method post">POST</span><span class="path">/api/reports/info</span><span class="pill">multipart/form-data</span></div>
+      <div class="endpoint-body">
+        <p class="purpose">El ciudadano aporta información concreta con descripción y foto opcional. Genera un <code>CitizenReport</code> de tipo <code>Info</code>. Además de las tablas comunes, escribe una tabla de staging para que se migre a MongoDB.</p>
+        <h4>Recibe (form-data) — <code>InfoReportRequest</code></h4>
+        <table>
+          <tr><th>Campo</th><th>Tipo</th><th>Req.</th><th>Validación</th></tr>
+          <tr><td><code>alertId</code></td><td>string</td><td class="req-yes">Sí</td><td>No vacío</td></tr>
+          <tr><td><code>citizenId</code></td><td>string</td><td class="req-yes">Sí</td><td>No vacío</td></tr>
+          <tr><td><code>latitude</code></td><td>double</td><td class="req-yes">Sí</td><td>-90 a 90</td></tr>
+          <tr><td><code>longitude</code></td><td>double</td><td class="req-yes">Sí</td><td>-180 a 180</td></tr>
+          <tr><td><code>description</code></td><td>string</td><td class="req-yes">Sí</td><td>≤ 1000 car.</td></tr>
+          <tr><td><code>reportedAt</code></td><td>datetime</td><td class="req-yes">Sí</td><td>Se convierte a UTC</td></tr>
+          <tr><td><code>photo</code></td><td>file</td><td class="req-no">No</td><td>jpg/png, ≤ 5 MB</td></tr>
+        </table>
+        <h4>Qué se escribe en las bases</h4>
+        <div class="flow">
+          <div class="flow-row disk"><span class="db-tag disk">Disco</span>
+            <div class="what">Si hay <code>photo</code>: <code>wwwroot/photos/{guid}.ext</code> → <code>photoUrl</code> relativo.</div></div>
+          <div class="flow-row cassandra"><span class="db-tag cassandra">Cassandra · inserta</span>
+            <div class="what"><span class="tbl">citizen_reports</span> — fila completa con <code>type = 1</code> e incluyendo <code>citizen_id, description, photo_url</code>.</div></div>
+          <div class="flow-row cassandra"><span class="db-tag cassandra">Cassandra · inserta</span>
+            <div class="what"><span class="tbl">citizen_reports_by_time</span> — copia reducida para el heatmap (sin descripción/foto).</div></div>
+          <div class="flow-row cassandra"><span class="db-tag cassandra">Cassandra · inserta</span>
+            <div class="what"><span class="tbl">info_reports_sync</span> — <strong>staging exclusivo de tipo Info</strong>. El InfoReportSyncService lo lee y lo migra a Mongo. Campos completos:
+<pre>time_bucket = "2026-06-07"
+reported_at = 2026-06-07T14:30:00Z
+id          = &lt;UUID&gt;
+alert_id    = "abc123"
+citizen_id  = "citizen-001"
+latitude    = -34.603722
+longitude   = -58.381592
+description = "Vi a una persona con campera roja..."
+photo_url   = "/photos/uuid.jpg"</pre></div></div>
+          <div class="flow-row mongo"><span class="db-tag mongo">Mongo · inserta</span>
+            <div class="what">Evento en <span class="tbl">admin_activity</span> (<code>Kind: "ReportSubmitted"</code>).</div></div>
+          <div class="flow-row mongo"><span class="db-tag mongo">Mongo · ~15 s después</span>
+            <div class="what">El <strong>InfoReportSyncService</strong> hace upsert del documento en <span class="tbl">info_reports</span> (esto no ocurre en el request, sino en el ciclo de sync).</div></div>
+        </div>
+        <h4>Responde — <code>CitizenReport</code></h4>
+<pre>{
+  "id": "uuid", "alertId": "abc123", "citizenId": "citizen-001",
+  "type": 1, "latitude": -34.60, "longitude": -58.38,
+  "description": "Vi a una persona...", "photoUrl": "/photos/uuid.jpg",
+  "reportedAt": "2026-06-07T14:30:00Z"
+}</pre>
+      </div>
+    </div>
+
+    <!-- GET reports by-alert -->
+    <div class="endpoint" id="get-reports-alert">
+      <div class="endpoint-head"><span class="method get">GET</span><span class="path">/api/reports/by-alert/{alertId}</span></div>
+      <div class="endpoint-body">
+        <p class="purpose">Lista todos los reportes (Awareness + Info) de una alerta, del más nuevo al más viejo. Lee directo de Cassandra (datos crudos, sin atraso de sync).</p>
+        <h4>Recibe</h4>
+        <table>
+          <tr><th>Param</th><th>Ubicación</th><th>Default</th></tr>
+          <tr><td><code>alertId</code></td><td>path</td><td>—</td></tr>
+          <tr><td><code>page</code> / <code>pageSize</code></td><td>query</td><td>1 / 50 (máx 100)</td></tr>
+        </table>
+        <h4>Acceso a base</h4>
+        <div class="flow"><div class="flow-row cassandra"><span class="db-tag cassandra">Cassandra · lee</span>
+          <div class="what">Itera los buckets de los <strong>últimos 30 días</strong> consultando <span class="tbl">citizen_reports</span> por <code>(alert_id, time_bucket)</code>; ordena y pagina en memoria. <span class="badge-op">MVP: sin paging-state del driver</span></div></div></div>
+        <h4>Responde</h4>
+        <p><code>PagedResponse&lt;CitizenReport&gt;</code> (incluye ambos tipos; los Awareness traen <code>description/photoUrl/citizenId</code> en null).</p>
+      </div>
+    </div>
+
+    <!-- GET info by-alert -->
+    <div class="endpoint" id="get-info-alert">
+      <div class="endpoint-head"><span class="method get">GET</span><span class="path">/api/reports/info/by-alert/{alertId}</span></div>
+      <div class="endpoint-body">
+        <p class="purpose">Lista solo los reportes de tipo Info (con descripción y foto) de una alerta. Lee de MongoDB, donde el InfoReportSyncService los deja pre-migrados.</p>
+        <div class="note">Atraso de <strong>~15 s</strong> respecto a la creación (consistencia eventual).</div>
+        <h4>Recibe</h4>
+        <table>
+          <tr><th>Param</th><th>Ubicación</th><th>Default</th></tr>
+          <tr><td><code>alertId</code></td><td>path</td><td>—</td></tr>
+          <tr><td><code>page</code> / <code>pageSize</code></td><td>query</td><td>1 / 50 (máx 100)</td></tr>
+        </table>
+        <h4>Acceso a base</h4>
+        <div class="flow"><div class="flow-row mongo"><span class="db-tag mongo">Mongo · lee</span>
+          <div class="what"><span class="tbl">info_reports</span> con <code>AlertId == alertId</code>, ordenado por <code>ReportedAt</code> desc.</div></div></div>
+        <h4>Responde — <code>PagedResponse&lt;InfoReportDocument&gt;</code></h4>
+<pre>{
+  "items": [{
+    "id": "uuid", "alertId": "abc123", "citizenId": "citizen-001",
+    "latitude": -34.60, "longitude": -58.38,
+    "description": "Vi a una persona con campera roja...",
+    "photoUrl": "/photos/uuid.jpg",
+    "reportedAt": "2026-06-07T14:30:00Z"
+  }],
+  "page": 1, "pageSize": 50, "totalItems": 8, "totalPages": 1
+}</pre>
+      </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- STATS -->
+    <!-- =================================================================== -->
+    <h2 class="section">Estadísticas — <code>/api/stats</code></h2>
+
+    <!-- overview -->
+    <div class="endpoint" id="get-overview">
+      <div class="endpoint-head"><span class="method get">GET</span><span class="path">/api/stats/overview</span></div>
+      <div class="endpoint-body">
+        <p class="purpose">Resumen general del sistema: conteo de alertas por estado y conteo de reportes por tipo.</p>
+        <h4>Acceso a base</h4>
+        <div class="flow">
+          <div class="flow-row mongo"><span class="db-tag mongo">Mongo · cuenta</span>
+            <div class="what"><span class="tbl">alerts</span>: total, y conteos por <code>Status</code> (Active/Resolved/Cancelled).</div></div>
+          <div class="flow-row cassandra"><span class="db-tag cassandra">Cassandra · lee</span>
+            <div class="what"><span class="tbl">citizen_reports_by_time</span>: trae los reportes (acotado internamente a 30 días de buckets) y los cuenta en memoria, separando Awareness vs Info.</div></div>
+        </div>
+        <h4>Responde — <code>StatsOverviewResponse</code></h4>
+<pre>{
+  "totalAlerts": 10, "activeAlerts": 6,
+  "resolvedAlerts": 3, "cancelledAlerts": 1,
+  "totalReports": 540, "totalAwarenessReports": 480, "totalInfoReports": 60
+}</pre>
+      </div>
+    </div>
+
+    <!-- heatmap -->
+    <div class="endpoint" id="get-heatmap">
+      <div class="endpoint-head"><span class="method get">GET</span><span class="path">/api/stats/heatmap</span></div>
+      <div class="endpoint-body">
+        <p class="purpose">Devuelve las celdas del mapa de calor para renderizar. <strong>Siempre lee la colección pre-agregada</strong> (Data Mart); nunca calcula al vuelo.</p>
+        <h4>Recibe (query)</h4>
+        <table>
+          <tr><th>Param</th><th>Tipo</th><th>Notas</th></tr>
+          <tr><td><code>alertId</code></td><td>string</td><td>Opcional. Si se omite, devuelve el heatmap <strong>global</strong> (celdas con <code>AlertId == null</code>).</td></tr>
+        </table>
+        <h4>Acceso a base</h4>
+        <div class="flow"><div class="flow-row mongo"><span class="db-tag mongo">Mongo · lee</span>
+          <div class="what"><span class="tbl">heatmap_cells</span> filtrando por <code>AlertId</code> (o <code>null</code> para global). Datos mantenidos por el HeatmapSyncService.</div></div></div>
+        <h4>Responde — <code>HeatmapResponse</code></h4>
+<pre>{
+  "alertId": "abc123",
+  "cells": [{
+    "centerLatitude": -34.603722, "centerLongitude": -58.381592,
+    "awarenessCount": 45, "infoCount": 8,
+    "weightedIntensity": 69.0,
+    "lastUpdated": "2026-06-07T14:15:00Z"
+  }]
+}</pre>
+        <p><code>weightedIntensity = infoCount×3 + awarenessCount×1</code>.</p>
+      </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- NOTIFICACIONES -->
+    <!-- =================================================================== -->
+    <h2 class="section">Notificaciones — <code>/api/notifications</code></h2>
+
+    <div class="endpoint" id="post-token">
+      <div class="endpoint-head"><span class="method post">POST</span><span class="path">/api/notifications/register-token</span><span class="pill">application/json</span></div>
+      <div class="endpoint-body">
+        <p class="purpose">Registra (o conserva) un token FCM de un dispositivo para recibir notificaciones push de nuevas alertas.</p>
+        <h4>Recibe (JSON) — <code>RegisterTokenRequest</code></h4>
+        <table>
+          <tr><th>Campo</th><th>Tipo</th><th>Req.</th><th>Notas</th></tr>
+          <tr><td><code>token</code></td><td>string</td><td class="req-yes">Sí</td><td>No vacío (sino 400)</td></tr>
+          <tr><td><code>role</code></td><td>string</td><td class="req-no">No*</td><td>Ej. "citizen", "entity". <em>Se loguea pero no se persiste.</em></td></tr>
+        </table>
+        <h4>Qué se escribe en la base</h4>
+        <div class="flow"><div class="flow-row mongo"><span class="db-tag mongo">Mongo · upsert</span>
+          <div class="what"><span class="tbl">device_tokens</span>: si el token no existe, inserta <code>{ Id: ObjectId, Token, RegisteredAt: UtcNow }</code>. Si ya existe, no hace nada. <strong>El campo <code>role</code> no se guarda.</strong></div></div></div>
+        <h4>Responde</h4>
+        <p><code>{ "success": true, "data": true }</code>. Token vacío → <span class="pill">400</span> <code>"Token inválido"</code>.</p>
+      </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- ADMIN -->
+    <!-- =================================================================== -->
+    <h2 class="section">Administración — <code>/api/admin</code></h2>
+    <p class="lead">Endpoints de solo lectura para el panel de administración. Agregan datos de ambas bases. Ninguno escribe.</p>
+
+    <!-- dashboard -->
+    <div class="endpoint" id="get-dashboard">
+      <div class="endpoint-head"><span class="method get">GET</span><span class="path">/api/admin/dashboard</span></div>
+      <div class="endpoint-body">
+        <p class="purpose">Snapshot completo del panel: estadísticas, alertas sin resolver, reportes recientes, feed de actividad y heatmap global. Resuelve todas las consultas en paralelo.</p>
+        <h4>Acceso a base</h4>
+        <div class="flow">
+          <div class="flow-row mongo"><span class="db-tag mongo">Mongo · lee</span>
+            <div class="what"><span class="tbl">alerts</span> (todas → filtra activas), <span class="tbl">admin_activity</span> (últimas 12), <span class="tbl">heatmap_cells</span> (global).</div></div>
+          <div class="flow-row cassandra"><span class="db-tag cassandra">Cassandra · lee</span>
+            <div class="what"><span class="tbl">citizen_reports_by_time</span> de los últimos 30 días → toma los 12 más recientes.</div></div>
+        </div>
+        <h4>Responde — <code>AdminDashboardResponse</code></h4>
+<pre>{
+  "generatedAt": "2026-06-12T18:00:00Z",
+  "stats": { /* StatsOverviewResponse */ },
+  "unresolvedAlerts": [ /* AlertResponse[] (Status=Active) */ ],
+  "recentReports": [ /* CitizenReport[] (12 más recientes) */ ],
+  "recentActivity": [ /* AdminActivityItem[] */ ],
+  "heatmap": [ /* HeatmapCellDto[] global */ ]
+}</pre>
+      </div>
+    </div>
+
+    <!-- activity -->
+    <div class="endpoint" id="get-activity">
+      <div class="endpoint-head"><span class="method get">GET</span><span class="path">/api/admin/activity</span></div>
+      <div class="endpoint-body">
+        <p class="purpose">Feed cronológico de eventos del sistema (alertas creadas, reportes recibidos, cambios de estado).</p>
+        <h4>Recibe (query)</h4>
+        <table><tr><th>Param</th><th>Default</th><th>Notas</th></tr><tr><td><code>limit</code></td><td>10</td><td>Acotado 1–100</td></tr></table>
+        <h4>Acceso a base</h4>
+        <div class="flow"><div class="flow-row mongo"><span class="db-tag mongo">Mongo · lee</span>
+          <div class="what"><span class="tbl">admin_activity</span> ordenado por <code>Timestamp</code> desc, top <code>limit</code>.</div></div></div>
+        <h4>Responde — <code>List&lt;AdminActivityItem&gt;</code></h4>
+<pre>[{
+  "id": "uuid", "kind": "AlertCreated",
+  "title": "Nueva alerta emitida",
+  "description": "Se emitió una alerta para Juan Pérez (35 años).",
+  "timestamp": "2026-06-10T14:00:00Z", "alertId": "abc123"
+}]</pre>
+        <p><code>kind</code> ∈ { <code>AlertCreated</code>, <code>ReportSubmitted</code>, <code>StatusChanged</code>, <code>System</code> }.</p>
+      </div>
+    </div>
+
+    <!-- admin alerts -->
+    <div class="endpoint" id="get-admin-alerts">
+      <div class="endpoint-head"><span class="method get">GET</span><span class="path">/api/admin/alerts</span></div>
+      <div class="endpoint-body">
+        <p class="purpose">Todas las alertas del sistema (cualquier estado), sin paginar, ordenadas por fecha de emisión descendente.</p>
+        <h4>Acceso a base</h4>
+        <div class="flow"><div class="flow-row mongo"><span class="db-tag mongo">Mongo · lee</span>
+          <div class="what"><span class="tbl">alerts</span> completa.</div></div></div>
+        <h4>Responde</h4>
+        <p><code>List&lt;AlertResponse&gt;</code>.</p>
+      </div>
+    </div>
+
+    <!-- admin reports -->
+    <div class="endpoint" id="get-admin-reports">
+      <div class="endpoint-head"><span class="method get">GET</span><span class="path">/api/admin/reports</span></div>
+      <div class="endpoint-body">
+        <p class="purpose">Tabla analítica de reportes "aplanada": cada reporte cruzado con datos de su alerta (nombre, edad, estado, emisor) y una métrica derivada de minutos hasta la resolución. Pensada para exportar/analizar.</p>
+        <h4>Recibe (query)</h4>
+        <table><tr><th>Param</th><th>Default</th><th>Notas</th></tr><tr><td><code>limit</code></td><td>1000</td><td>Acotado 1–5000</td></tr></table>
+        <h4>Acceso a base (join en memoria)</h4>
+        <div class="flow">
+          <div class="flow-row cassandra"><span class="db-tag cassandra">Cassandra · lee</span>
+            <div class="what"><span class="tbl">citizen_reports_by_time</span> de los últimos 30 días.</div></div>
+          <div class="flow-row mongo"><span class="db-tag mongo">Mongo · lee</span>
+            <div class="what"><span class="tbl">alerts</span> (todas) → se arma un diccionario por <code>id</code> para enriquecer cada reporte.</div></div>
+        </div>
+        <h4>Responde — <code>List&lt;AdminReportRow&gt;</code></h4>
+<pre>[{
+  "reportId": "uuid", "alertId": "abc123",
+  "alertName": "Juan Pérez", "alertAge": 35,
+  "emitterId": 1, "alertStatus": "Resolved",
+  "resolvedAt": "2026-06-08T10:00:00Z",
+  "reportType": "Info",
+  "latitude": -34.60, "longitude": -58.38,
+  "reportedAt": "2026-06-07T14:30:00Z",
+  "description": "...", "photoUrl": "/photos/uuid.jpg",
+  "minutesToResolution": 1170.0
+}]</pre>
+        <div class="note"><code>minutesToResolution</code> = minutos entre <code>reportedAt</code> y <code>resolvedAt</code> de la alerta; <code>null</code> si la alerta sigue activa. Como los reportes vienen de <span class="tbl">citizen_reports_by_time</span>, <code>description</code> y <code>photoUrl</code> llegan en <code>null</code> (esa tabla no los almacena).</div>
+      </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- REFERENCIA: ESTRUCTURAS -->
+    <!-- =================================================================== -->
+    <h2 class="section" id="estructuras-cassandra">Referencia — estructuras en Cassandra</h2>
+    <p>Keyspace <code>safesight</code>. La forma exacta de cada fila escrita por la API:</p>
+
+    <h4>citizen_reports <span class="badge-op">tabla principal de reportes</span></h4>
+    <table>
+      <tr><th>Columna</th><th>Tipo</th><th>Rol / notas</th></tr>
+      <tr><td><code>alert_id</code></td><td>TEXT</td><td>Partition key (1/2)</td></tr>
+      <tr><td><code>time_bucket</code></td><td>TEXT</td><td>Partition key (2/2) — <code>YYYY-MM-DD</code> (UTC), evita hot partitions</td></tr>
+      <tr><td><code>reported_at</code></td><td>TIMESTAMP</td><td>Clustering (orden ASC)</td></tr>
+      <tr><td><code>id</code></td><td>UUID</td><td>Clustering — unicidad de fila</td></tr>
+      <tr><td><code>type</code></td><td>INT</td><td>0=Awareness, 1=Info</td></tr>
+      <tr><td><code>citizen_id</code></td><td>TEXT</td><td>Solo Info (null en Awareness)</td></tr>
+      <tr><td><code>latitude / longitude</code></td><td>DOUBLE</td><td>—</td></tr>
+      <tr><td><code>description</code></td><td>TEXT</td><td>Solo Info</td></tr>
+      <tr><td><code>photo_url</code></td><td>TEXT</td><td>Solo Info con foto</td></tr>
+    </table>
+
+    <h4>citizen_reports_by_time <span class="badge-op">desnormalización para heatmap / scans por día</span></h4>
+    <p>PK <code>(time_bucket, reported_at, id)</code>. Columnas: <code>time_bucket, reported_at, alert_id, id, type, latitude, longitude</code>. <strong>No</strong> guarda descripción ni foto.</p>
+
+    <h4>info_reports_sync <span class="badge-op">staging — solo tipo Info</span></h4>
+    <p>PK <code>(time_bucket, reported_at, id)</code>. Campos completos del reporte Info (incluye <code>citizen_id, description, photo_url</code>). El InfoReportSyncService la consume y la lleva a Mongo.</p>
+
+    <h4>sync_checkpoints <span class="badge-op">control de los background services</span></h4>
+    <p><code>service_name</code> TEXT PK + <code>last_processed_at</code> TIMESTAMP. Filas: <code>heatmap_sync</code>, <code>info_report_sync</code>.</p>
+
+    <h2 class="section" id="estructuras-mongo">Referencia — estructuras en MongoDB</h2>
+    <p>Base de datos <code>safesight</code>.</p>
+
+    <h4>alerts <span class="badge-op">datos maestros — estructura anidada</span></h4>
+<pre>{
+  "_id": "ObjectId (string)",
+  "MissingPerson": { "FirstName", "LastName", "Age",
+                     "PhysicalDescription", "PhotoUrl" },
+  "Situation": "...",
+  "LastKnownLocation": { "Latitude", "Longitude" },
+  "DisappearanceDate", "EmitterId", "EmittedAt",
+  "Status": "Active|Resolved|Cancelled", "ResolvedAt": null
+}</pre>
+    <p>Índices: <code>{ Status }</code>, <code>{ EmitterId, Status }</code>. <span class="badge-op">Ojo: la API recibe y devuelve la alerta en forma <em>plana</em> (AlertResponse), pero en Mongo se almacena anidada.</span></p>
+
+    <h4>heatmap_cells <span class="badge-op">Data Mart pre-agregado</span></h4>
+<pre>{
+  "_id": "{alertId}|{geohash}"  // o "global|{geohash}",
+  "AlertId": "abc123" | null,
+  "CenterLatitude", "CenterLongitude",
+  "AwarenessCount", "InfoCount", "WeightedIntensity",
+  "LastUpdated"
+}</pre>
+    <p>Lo escribe el HeatmapSyncService (upsert acumulativo). Índice: <code>{ AlertId }</code>.</p>
+
+    <h4>info_reports <span class="badge-op">reportes Info migrados desde Cassandra</span></h4>
+<pre>{ "_id": "uuid (Guid)", "AlertId", "CitizenId",
+  "Latitude", "Longitude", "Description", "PhotoUrl", "ReportedAt" }</pre>
+    <p>Lo escribe el InfoReportSyncService (upsert). Índices: <code>{ AlertId }</code>, <code>{ CitizenId }</code>.</p>
+
+    <h4>admin_activity <span class="badge-op">feed del panel</span></h4>
+<pre>{ "_id": "uuid", "Kind", "Title", "Description", "Timestamp", "AlertId" }</pre>
+    <p>Se escribe en tiempo real al crear alertas/reportes o cambiar estado. Índice: <code>{ Timestamp: -1 }</code>.</p>
+
+    <h4>device_tokens <span class="badge-op">tokens FCM</span></h4>
+<pre>{ "_id": "ObjectId", "Token", "RegisteredAt" }</pre>
+    <p>Sin índice adicional. El <code>role</code> que llega en el request no se persiste.</p>
+
+    <footer>
+      Generado a partir del código fuente de <code>SafeSight.Api</code> (controllers, services, repositories y modelos). Las URLs de fotos son relativas (<code>/photos/...</code>) y se sirven como archivos estáticos. Todos los timestamps se almacenan en UTC.
+    </footer>
+  </main>
+</div>
+</body>
+</html>

@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SafeSight — Modelo de datos y relaciones (ER lógico)</title>
+<style>
+  :root{
+    --ink:#1a1f2b; --muted:#6b7685; --line:#d9dee6; --bg:#fff; --paper:#f6f7f9;
+    --accent:#1f5fae; --accent-soft:#eaf1fb;
+    --cass:#b03060; --cass-bg:#fbeef3; --mongo:#2e7d4f; --mongo-bg:#eaf6ee;
+    --warn:#9a6b00; --warn-bg:#fdf5e3;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-size:15.5px;line-height:1.6;}
+  .page{max-width:1180px;margin:0 auto;background:var(--bg);padding:0 0 70px;}
+  header.cover{padding:40px 48px 26px;border-bottom:3px solid var(--accent);}
+  .kicker{text-transform:uppercase;letter-spacing:.14em;font-size:11.5px;color:var(--accent);font-weight:700;}
+  h1{font-size:30px;margin:8px 0 4px;letter-spacing:-.01em;}
+  h1 small{display:block;font-size:16px;color:var(--muted);font-weight:400;margin-top:6px;}
+  .wrap{padding:0 48px;}
+  h2{font-size:21px;margin:42px 0 6px;padding-top:18px;border-top:1px solid var(--line);}
+  h2 .n{color:var(--accent);font-weight:800;margin-right:8px;}
+  h3{font-size:16.5px;margin:24px 0 4px;}
+  p{margin:10px 0;}
+  code{font-family:"SF Mono",Menlo,Consolas,monospace;font-size:.85em;background:#eef1f5;padding:1px 5px;border-radius:4px;color:#2b3a55;}
+  /* legend */
+  .legend{display:flex;flex-wrap:wrap;gap:16px;margin:14px 0;font-size:13px;}
+  .legend .it{display:flex;align-items:center;gap:7px;}
+  .sw{width:26px;height:15px;border-radius:4px;border:1px solid #0002;display:inline-block;}
+  .sw.cass{background:var(--cass);} .sw.mongo{background:var(--mongo);}
+  .ln{width:30px;height:0;border-top:2px solid var(--accent);display:inline-block;}
+  .ln.dash{border-top:2px dashed var(--muted);}
+  .key{font-family:"SF Mono",monospace;font-size:11px;font-weight:700;padding:1px 5px;border-radius:3px;}
+  .key.pk{background:#fde9b5;color:#7a5600;} .key.fk{background:#d6e4fb;color:#1c4a86;}
+  /* diagram frame */
+  .erbox{border:1px solid var(--line);border-radius:12px;background:#fbfcfe;padding:10px;margin:16px 0;overflow-x:auto;}
+  svg{display:block;width:100%;height:auto;min-width:880px;}
+  /* tables */
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13.5px;}
+  caption{caption-side:top;text-align:left;font-size:12.5px;color:var(--muted);font-style:italic;margin-bottom:6px;}
+  th,td{border:1px solid var(--line);padding:7px 10px;text-align:left;vertical-align:top;}
+  th{background:var(--paper);font-weight:700;}
+  tbody tr:nth-child(even){background:#fafbfc;}
+  .tag{font-size:11px;font-weight:700;padding:1px 7px;border-radius:20px;}
+  .tag.cass{background:var(--cass-bg);color:var(--cass);border:1px solid #e7b9cc;}
+  .tag.mongo{background:var(--mongo-bg);color:var(--mongo);border:1px solid #b8ddc4;}
+  .callout{border-left:4px solid var(--accent);background:var(--accent-soft);padding:11px 15px;border-radius:0 8px 8px 0;margin:16px 0;font-size:14px;}
+  .callout.warn{border-left-color:var(--warn);background:var(--warn-bg);}
+  .callout .lbl{font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:3px;}
+  pre.flow{background:#fbfcfe;border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto;
+    font-family:"SF Mono",Menlo,Consolas,monospace;font-size:12px;line-height:1.4;color:var(--ink);}
+  pre.flow b{color:var(--accent);}
+  footer{font-size:12.5px;color:var(--muted);padding:26px 48px 0;border-top:1px solid var(--line);margin-top:40px;}
+  @media print{ body{background:#fff;} svg{min-width:0;} .erbox{overflow:visible;} }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="cover">
+    <div class="kicker">SafeSight · Ingeniería de Datos II · G5</div>
+    <h1>Modelo de datos y relaciones
+      <small>Diagrama entidad–relación lógico sobre persistencia políglota (MongoDB + Cassandra)</small>
+    </h1>
+  </header>
+
+  <div class="wrap">
+    <h2><span class="n">1</span>Cómo leer este modelo</h2>
+    <p>SafeSight usa dos motores <strong>NoSQL</strong>, por lo que <strong>no existen claves foráneas físicas</strong> que la base imponga (no hay <em>JOINs</em> ni integridad referencial automática). Sin embargo, sí hay <strong>relaciones lógicas</strong> que la aplicación mantiene por convención. Este diagrama las representa como si fuera un modelo relacional, para hacerlas visibles.</p>
+    <p>Hay <strong>dos ejes de relación</strong>:</p>
+    <ul>
+      <li><strong>Por <code>alertId</code></strong> (líneas llenas azules): la entidad central es <code>alerts</code>; casi todo lo demás «cuelga» de una alerta. Es una relación <strong>1 : N</strong> (una alerta tiene muchos reportes, muchas celdas, etc.).</li>
+      <li><strong>Por <code>id</code> de reporte / linaje (líneas punteadas grises):</strong> el mismo reporte ciudadano se escribe con el <strong>mismo UUID</strong> en varias tablas de Cassandra y luego se migra a Mongo conservando ese id. Es una relación <strong>1 : 1</strong> entre representaciones del mismo evento.</li>
+    </ul>
+
+    <div class="legend">
+      <span class="it"><span class="sw mongo"></span> Colección <strong>MongoDB</strong></span>
+      <span class="it"><span class="sw cass"></span> Tabla <strong>Cassandra</strong></span>
+      <span class="it"><span class="key pk">PK</span> Clave primaria</span>
+      <span class="it"><span class="key fk">FK</span> Clave foránea lógica</span>
+      <span class="it"><span class="ln"></span> Relación por <code>alertId</code> (1:N)</span>
+      <span class="it"><span class="ln dash"></span> Linaje / mismo <code>id</code> (1:1)</span>
+    </div>
+
+    <!-- ================= DIAGRAMA ER ================= -->
+    <h2><span class="n">2</span>Diagrama entidad–relación</h2>
+    <div class="erbox">
+      <svg viewBox="0 0 1180 900" role="img" aria-label="Diagrama ER de SafeSight">
+        <defs>
+          <marker id="one" markerWidth="14" markerHeight="14" refX="7" refY="7" orient="auto">
+            <line x1="7" y1="2" x2="7" y2="12" stroke="#1f5fae" stroke-width="2"/>
+          </marker>
+          <marker id="many" markerWidth="18" markerHeight="16" refX="13" refY="8" orient="auto">
+            <path d="M2,8 L13,2 M2,8 L13,8 M2,8 L13,14" stroke="#1f5fae" stroke-width="1.6" fill="none"/>
+          </marker>
+        </defs>
+
+        <!-- ===== CONNECTORS (alertId 1:N) ===== -->
+        <g stroke="#1f5fae" stroke-width="2" fill="none">
+          <line x1="470" y1="360" x2="205" y2="138" marker-start="url(#one)" marker-end="url(#many)"/>
+          <line x1="575" y1="350" x2="578" y2="140" marker-start="url(#one)" marker-end="url(#many)"/>
+          <line x1="708" y1="360" x2="998" y2="138" marker-start="url(#one)" marker-end="url(#many)"/>
+          <line x1="725" y1="420" x2="902" y2="412" marker-start="url(#one)" marker-end="url(#many)"/>
+          <line x1="590" y1="540" x2="582" y2="688" marker-start="url(#one)" marker-end="url(#many)"/>
+          <line x1="455" y1="430" x2="258" y2="424" marker-start="url(#one)" marker-end="url(#many)"/>
+        </g>
+        <!-- connector labels -->
+        <g font-family="monospace" font-size="11.5" fill="#1f5fae" font-weight="700">
+          <text x="300" y="244" text-anchor="middle">alert_id · 1:N</text>
+          <text x="600" y="250" text-anchor="middle">alert_id · 1:N</text>
+          <text x="880" y="244" text-anchor="middle">alert_id · 1:N</text>
+          <text x="812" y="400">AlertId · 1:N</text>
+          <text x="600" y="620">AlertId · 1:0..N</text>
+          <text x="356" y="412" text-anchor="middle">AlertId · 1:0..N</text>
+        </g>
+
+        <!-- ===== LINEAGE (same report id, dashed) ===== -->
+        <g stroke="#6b7685" stroke-width="1.8" stroke-dasharray="6 5" fill="none">
+          <!-- citizen_reports -> citizen_reports_by_time -->
+          <line x1="256" y1="70" x2="472" y2="70"/>
+          <!-- citizen_reports_by_time -> info_reports_sync -->
+          <line x1="688" y1="70" x2="904" y2="70"/>
+          <!-- info_reports_sync (SYNC) -> info_reports -->
+          <line x1="1012" y1="136" x2="1012" y2="360"/>
+        </g>
+        <g font-family="monospace" font-size="10.5" fill="#6b7685">
+          <text x="364" y="60" text-anchor="middle">mismo id (1:1)</text>
+          <text x="796" y="60" text-anchor="middle">mismo id (1:1)</text>
+          <text x="1020" y="252" font-weight="700" fill="#9a6b00">SYNC ▼ (15s)</text>
+        </g>
+
+        <!-- ============ ENTITIES ============ -->
+        <!-- helper styling done inline -->
+
+        <!-- citizen_reports (Cassandra) -->
+        <g>
+          <rect x="40" y="40" width="216" height="98" rx="8" fill="#fff" stroke="#b03060" stroke-width="1.5"/>
+          <rect x="40" y="40" width="216" height="24" rx="8" fill="#b03060"/>
+          <rect x="40" y="52" width="216" height="12" fill="#b03060"/>
+          <text x="50" y="57" fill="#fff" font-size="13" font-weight="700">citizen_reports</text>
+          <text x="247" y="57" fill="#fff" font-size="9.5" text-anchor="end">CASSANDRA</text>
+          <text x="50" y="80" font-size="11" font-family="monospace"><tspan fill="#7a5600" font-weight="700">PK</tspan> (alert_id, time_bucket,</text>
+          <text x="68" y="94" font-size="11" font-family="monospace">reported_at, id)</text>
+          <text x="50" y="110" font-size="11" font-family="monospace"><tspan fill="#1c4a86" font-weight="700">FK</tspan> alert_id → alerts._id</text>
+          <text x="50" y="126" font-size="10.5" font-family="monospace" fill="#6b7685">type · lat · lon · descr · foto</text>
+        </g>
+
+        <!-- citizen_reports_by_time (Cassandra) -->
+        <g>
+          <rect x="472" y="40" width="216" height="98" rx="8" fill="#fff" stroke="#b03060" stroke-width="1.5"/>
+          <rect x="472" y="40" width="216" height="24" rx="8" fill="#b03060"/>
+          <rect x="472" y="52" width="216" height="12" fill="#b03060"/>
+          <text x="482" y="57" fill="#fff" font-size="13" font-weight="700">citizen_reports_by_time</text>
+          <text x="482" y="80" font-size="11" font-family="monospace"><tspan fill="#7a5600" font-weight="700">PK</tspan> (time_bucket,</text>
+          <text x="500" y="94" font-size="11" font-family="monospace">reported_at, id)</text>
+          <text x="482" y="110" font-size="11" font-family="monospace"><tspan fill="#1c4a86" font-weight="700">FK</tspan> alert_id → alerts._id</text>
+          <text x="482" y="126" font-size="10.5" font-family="monospace" fill="#6b7685">espejo p/ heatmap (sin foto)</text>
+        </g>
+
+        <!-- info_reports_sync (Cassandra) -->
+        <g>
+          <rect x="904" y="40" width="216" height="98" rx="8" fill="#fff" stroke="#b03060" stroke-width="1.5"/>
+          <rect x="904" y="40" width="216" height="24" rx="8" fill="#b03060"/>
+          <rect x="904" y="52" width="216" height="12" fill="#b03060"/>
+          <text x="914" y="57" fill="#fff" font-size="13" font-weight="700">info_reports_sync</text>
+          <text x="1111" y="57" fill="#fff" font-size="9.5" text-anchor="end">CASSANDRA</text>
+          <text x="914" y="80" font-size="11" font-family="monospace"><tspan fill="#7a5600" font-weight="700">PK</tspan> (time_bucket,</text>
+          <text x="932" y="94" font-size="11" font-family="monospace">reported_at, id)</text>
+          <text x="914" y="110" font-size="11" font-family="monospace"><tspan fill="#1c4a86" font-weight="700">FK</tspan> alert_id → alerts._id</text>
+          <text x="914" y="126" font-size="10.5" font-family="monospace" fill="#6b7685">staging · solo type=Info</text>
+        </g>
+
+        <!-- admin_activity (Mongo) -->
+        <g>
+          <rect x="40" y="372" width="216" height="98" rx="8" fill="#fff" stroke="#2e7d4f" stroke-width="1.5"/>
+          <rect x="40" y="372" width="216" height="24" rx="8" fill="#2e7d4f"/>
+          <rect x="40" y="384" width="216" height="12" fill="#2e7d4f"/>
+          <text x="50" y="389" fill="#fff" font-size="13" font-weight="700">admin_activity</text>
+          <text x="247" y="389" fill="#fff" font-size="9.5" text-anchor="end">MONGODB</text>
+          <text x="50" y="412" font-size="11" font-family="monospace"><tspan fill="#7a5600" font-weight="700">PK</tspan> _id</text>
+          <text x="50" y="428" font-size="11" font-family="monospace"><tspan fill="#1c4a86" font-weight="700">FK</tspan> AlertId → alerts._id (null)</text>
+          <text x="50" y="444" font-size="10.5" font-family="monospace" fill="#6b7685">Kind · Title · Timestamp</text>
+          <text x="50" y="460" font-size="10.5" font-family="monospace" fill="#6b7685">feed del panel admin</text>
+        </g>
+
+        <!-- ALERTS (Mongo, center) -->
+        <g>
+          <rect x="455" y="350" width="270" height="190" rx="10" fill="#fff" stroke="#2e7d4f" stroke-width="2.5"/>
+          <rect x="455" y="350" width="270" height="26" rx="10" fill="#2e7d4f"/>
+          <rect x="455" y="363" width="270" height="13" fill="#2e7d4f"/>
+          <text x="467" y="368" fill="#fff" font-size="14.5" font-weight="800">alerts</text>
+          <text x="716" y="368" fill="#fff" font-size="9.5" text-anchor="end">MONGODB · ENTIDAD CENTRAL</text>
+          <text x="467" y="394" font-size="11.5" font-family="monospace"><tspan fill="#7a5600" font-weight="700">PK</tspan> _id  (= alertId)</text>
+          <text x="467" y="411" font-size="11.5" font-family="monospace">EmitterId  (1=ciu · 2=ent/agente)</text>
+          <text x="467" y="428" font-size="11.5" font-family="monospace">Status · DisappearanceDate</text>
+          <!-- embedded sub-boxes -->
+          <rect x="467" y="440" width="246" height="40" rx="6" fill="#eaf6ee" stroke="#b8ddc4"/>
+          <text x="475" y="456" font-size="10.5" font-family="monospace" fill="#2e7d4f" font-weight="700">⌗ MissingPerson (embebido 1:1)</text>
+          <text x="475" y="471" font-size="10" font-family="monospace" fill="#43614f">FirstName · LastName · Age · Photo</text>
+          <rect x="467" y="486" width="246" height="40" rx="6" fill="#eaf6ee" stroke="#b8ddc4"/>
+          <text x="475" y="502" font-size="10.5" font-family="monospace" fill="#2e7d4f" font-weight="700">⌗ LastKnownLocation (embebido 1:1)</text>
+          <text x="475" y="517" font-size="10" font-family="monospace" fill="#43614f">Latitude · Longitude</text>
+        </g>
+
+        <!-- info_reports (Mongo) -->
+        <g>
+          <rect x="904" y="360" width="216" height="112" rx="8" fill="#fff" stroke="#2e7d4f" stroke-width="1.5"/>
+          <rect x="904" y="360" width="216" height="24" rx="8" fill="#2e7d4f"/>
+          <rect x="904" y="372" width="216" height="12" fill="#2e7d4f"/>
+          <text x="914" y="377" fill="#fff" font-size="13" font-weight="700">info_reports</text>
+          <text x="1111" y="377" fill="#fff" font-size="9.5" text-anchor="end">MONGODB</text>
+          <text x="914" y="400" font-size="11" font-family="monospace"><tspan fill="#7a5600" font-weight="700">PK</tspan> Id  (= id del reporte)</text>
+          <text x="914" y="416" font-size="11" font-family="monospace"><tspan fill="#1c4a86" font-weight="700">FK</tspan> AlertId → alerts._id</text>
+          <text x="914" y="432" font-size="11" font-family="monospace"><tspan fill="#1c4a86" font-weight="700">FK</tspan> CitizenId</text>
+          <text x="914" y="448" font-size="10.5" font-family="monospace" fill="#6b7685">Description · PhotoUrl</text>
+          <text x="914" y="464" font-size="10.5" font-family="monospace" fill="#6b7685">migrado desde info_reports_sync</text>
+        </g>
+
+        <!-- heatmap_cells (Mongo) -->
+        <g>
+          <rect x="472" y="690" width="240" height="104" rx="8" fill="#fff" stroke="#2e7d4f" stroke-width="1.5"/>
+          <rect x="472" y="690" width="240" height="24" rx="8" fill="#2e7d4f"/>
+          <rect x="472" y="702" width="240" height="12" fill="#2e7d4f"/>
+          <text x="482" y="707" fill="#fff" font-size="13" font-weight="700">heatmap_cells</text>
+          <text x="703" y="707" fill="#fff" font-size="9.5" text-anchor="end">MONGODB</text>
+          <text x="482" y="730" font-size="10.5" font-family="monospace"><tspan fill="#7a5600" font-weight="700">PK</tspan> _id = "{AlertId}|{geohash}"</text>
+          <text x="482" y="746" font-size="11" font-family="monospace"><tspan fill="#1c4a86" font-weight="700">FK</tspan> AlertId → alerts._id</text>
+          <text x="494" y="760" font-size="10" font-family="monospace" fill="#6b7685">(null ⇒ celda global)</text>
+          <text x="482" y="778" font-size="10.5" font-family="monospace" fill="#6b7685">Awareness/InfoCount · Intensity</text>
+        </g>
+
+        <!-- independent box -->
+        <rect x="60" y="640" width="360" height="150" rx="10" fill="none" stroke="#c4ccd6" stroke-width="1.5" stroke-dasharray="5 5"/>
+        <text x="74" y="662" font-size="11" fill="#6b7685" font-weight="700">SIN RELACIÓN (entidades independientes)</text>
+        <!-- device_tokens -->
+        <g>
+          <rect x="78" y="676" width="150" height="96" rx="8" fill="#fff" stroke="#2e7d4f" stroke-width="1.5"/>
+          <rect x="78" y="676" width="150" height="24" rx="8" fill="#2e7d4f"/>
+          <rect x="78" y="688" width="150" height="12" fill="#2e7d4f"/>
+          <text x="88" y="693" fill="#fff" font-size="12.5" font-weight="700">device_tokens</text>
+          <text x="88" y="716" font-size="10.5" font-family="monospace"><tspan fill="#7a5600" font-weight="700">PK</tspan> _id = token</text>
+          <text x="88" y="732" font-size="10" font-family="monospace" fill="#6b7685">RegisteredAt</text>
+          <text x="88" y="752" font-size="10" font-family="monospace" fill="#6b7685">push a todos</text>
+        </g>
+        <!-- sync_checkpoints -->
+        <g>
+          <rect x="250" y="676" width="156" height="96" rx="8" fill="#fff" stroke="#b03060" stroke-width="1.5"/>
+          <rect x="250" y="676" width="156" height="24" rx="8" fill="#b03060"/>
+          <rect x="250" y="688" width="156" height="12" fill="#b03060"/>
+          <text x="260" y="693" fill="#fff" font-size="12.5" font-weight="700">sync_checkpoints</text>
+          <text x="260" y="716" font-size="10.5" font-family="monospace"><tspan fill="#7a5600" font-weight="700">PK</tspan> service_name</text>
+          <text x="260" y="732" font-size="10" font-family="monospace" fill="#6b7685">last_processed_at</text>
+          <text x="260" y="752" font-size="10" font-family="monospace" fill="#6b7685">control del pipeline</text>
+        </g>
+      </svg>
+    </div>
+
+    <div class="callout">
+      <span class="lbl">La clave de todo: <code>alertId</code></span>
+      Una <strong>alerta</strong> es el «padre» de todo el resto. Cuando un agente crea una alerta, Mongo le asigna un <code>_id</code>; ese valor se copia como <code>alert_id</code> / <code>AlertId</code> en cada reporte, celda de heatmap, info-report y evento de actividad. No es una FK que la base valide: es la app la que la propaga.
+    </div>
+
+    <!-- ================= RELACIONES ================= -->
+    <h2><span class="n">3</span>Tabla de relaciones lógicas</h2>
+    <table>
+      <caption>Tabla 3.1 — Relaciones entre estructuras (equivalente a las FK de un modelo relacional).</caption>
+      <thead><tr><th>Desde (hijo)</th><th>Campo</th><th>Hacia (padre)</th><th>Card.</th><th>Tipo</th></tr></thead>
+      <tbody>
+        <tr><td><span class="tag cass">citizen_reports</span></td><td><code>alert_id</code></td><td><span class="tag mongo">alerts</span> <code>_id</code></td><td>N : 1</td><td>por alertId</td></tr>
+        <tr><td><span class="tag cass">citizen_reports_by_time</span></td><td><code>alert_id</code></td><td><span class="tag mongo">alerts</span> <code>_id</code></td><td>N : 1</td><td>por alertId</td></tr>
+        <tr><td><span class="tag cass">info_reports_sync</span></td><td><code>alert_id</code></td><td><span class="tag mongo">alerts</span> <code>_id</code></td><td>N : 1</td><td>por alertId</td></tr>
+        <tr><td><span class="tag mongo">info_reports</span></td><td><code>AlertId</code></td><td><span class="tag mongo">alerts</span> <code>_id</code></td><td>N : 1</td><td>por alertId</td></tr>
+        <tr><td><span class="tag mongo">heatmap_cells</span></td><td><code>AlertId</code></td><td><span class="tag mongo">alerts</span> <code>_id</code></td><td>N : 1 (0..1)</td><td>por alertId · <code>null</code>=global</td></tr>
+        <tr><td><span class="tag mongo">admin_activity</span></td><td><code>AlertId</code></td><td><span class="tag mongo">alerts</span> <code>_id</code></td><td>N : 1 (0..1)</td><td>por alertId · nullable</td></tr>
+        <tr><td><span class="tag mongo">alerts.MissingPerson</span></td><td>embebido</td><td><span class="tag mongo">alerts</span></td><td>1 : 1</td><td>sub-documento</td></tr>
+        <tr><td><span class="tag mongo">alerts.LastKnownLocation</span></td><td>embebido</td><td><span class="tag mongo">alerts</span></td><td>1 : 1</td><td>sub-documento</td></tr>
+        <tr><td colspan="5" style="background:#f3f5f8;font-style:italic;color:#555;">Linaje del mismo reporte (mismo <code>id</code> UUID a lo largo del pipeline)</td></tr>
+        <tr><td><span class="tag cass">citizen_reports</span> · <span class="tag cass">citizen_reports_by_time</span> · <span class="tag cass">info_reports_sync</span></td><td><code>id</code></td><td><span class="tag mongo">info_reports</span> <code>Id</code></td><td>1 : 1</td><td>linaje (mismo evento)</td></tr>
+        <tr><td><span class="tag cass">citizen_reports</span></td><td><code>citizen_id</code></td><td><span class="tag mongo">info_reports</span> <code>CitizenId</code></td><td>N : 1</td><td>id de ciudadano (externo, sin tabla propia)</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout warn">
+      <span class="lbl">Importante — no hay tablas de catálogo</span>
+      No existe una colección/tabla de <em>ciudadanos</em> ni de <em>emisores/agentes</em>. El <code>citizen_id</code> y el <code>EmitterId</code> son identificadores generados/asignados fuera de la base (en la app), por eso aparecen como atributos y no como entidades con su propia clave primaria. Hoy tampoco hay autenticación que los respalde.
+    </div>
+
+    <!-- ================= DICCIONARIO ================= -->
+    <h2><span class="n">4</span>Diccionario de datos por entidad</h2>
+
+    <h3><span class="tag mongo">MongoDB</span> alerts</h3>
+    <table>
+      <thead><tr><th>Campo</th><th>Tipo</th><th>Clave</th><th>Notas</th></tr></thead>
+      <tbody>
+        <tr><td><code>_id</code></td><td>ObjectId (string)</td><td><span class="key pk">PK</span></td><td>= alertId; referenciado por todo el resto</td></tr>
+        <tr><td><code>MissingPerson</code></td><td>objeto embebido</td><td></td><td>FirstName, LastName, Age, PhysicalDescription, PhotoUrl</td></tr>
+        <tr><td><code>LastKnownLocation</code></td><td>objeto embebido</td><td></td><td>Latitude, Longitude</td></tr>
+        <tr><td><code>Situation</code></td><td>string</td><td></td><td>—</td></tr>
+        <tr><td><code>DisappearanceDate</code></td><td>date (UTC)</td><td></td><td>—</td></tr>
+        <tr><td><code>EmitterId</code></td><td>int</td><td></td><td>1=ciudadano · 2=entidad/agente</td></tr>
+        <tr><td><code>EmittedAt</code></td><td>date (UTC)</td><td></td><td>fecha de alta</td></tr>
+        <tr><td><code>Status</code></td><td>enum string</td><td></td><td>Active · Resolved · Cancelled</td></tr>
+        <tr><td><code>ResolvedAt</code></td><td>date? (UTC)</td><td></td><td>se setea al resolver/cancelar</td></tr>
+      </tbody>
+    </table>
+
+    <h3><span class="tag cass">Cassandra</span> citizen_reports</h3>
+    <table>
+      <thead><tr><th>Campo</th><th>Tipo</th><th>Clave</th><th>Notas</th></tr></thead>
+      <tbody>
+        <tr><td><code>alert_id</code></td><td>TEXT</td><td><span class="key pk">PK</span> partición <span class="key fk">FK</span></td><td>→ alerts._id</td></tr>
+        <tr><td><code>time_bucket</code></td><td>TEXT</td><td><span class="key pk">PK</span> partición</td><td><code>YYYY-MM-DD</code>; evita hot partitions</td></tr>
+        <tr><td><code>reported_at</code></td><td>TIMESTAMP</td><td><span class="key pk">PK</span> clustering</td><td>orden cronológico</td></tr>
+        <tr><td><code>id</code></td><td>UUID</td><td><span class="key pk">PK</span> clustering</td><td>id del reporte (linaje)</td></tr>
+        <tr><td><code>type</code></td><td>INT</td><td></td><td>0=Awareness · 1=Info</td></tr>
+        <tr><td><code>citizen_id</code></td><td>TEXT</td><td></td><td>solo Info</td></tr>
+        <tr><td><code>latitude / longitude</code></td><td>DOUBLE</td><td></td><td>ubicación del aporte</td></tr>
+        <tr><td><code>description / photo_url</code></td><td>TEXT</td><td></td><td>solo Info</td></tr>
+      </tbody>
+    </table>
+
+    <h3><span class="tag cass">Cassandra</span> citizen_reports_by_time · info_reports_sync</h3>
+    <table>
+      <thead><tr><th>Campo</th><th>Tipo</th><th>Clave</th><th>Notas</th></tr></thead>
+      <tbody>
+        <tr><td><code>time_bucket</code></td><td>TEXT</td><td><span class="key pk">PK</span> partición</td><td>permite escanear un día sin saber el alert_id</td></tr>
+        <tr><td><code>reported_at, id</code></td><td>TIMESTAMP, UUID</td><td><span class="key pk">PK</span> clustering</td><td><code>id</code> = mismo reporte (linaje)</td></tr>
+        <tr><td><code>alert_id</code></td><td>TEXT</td><td><span class="key fk">FK</span></td><td>→ alerts._id</td></tr>
+        <tr><td colspan="4"><em>by_time</em>: type, lat, lon (espejo liviano p/ heatmap). <em>info_reports_sync</em>: + citizen_id, description, photo_url (staging completo, solo Info).</td></tr>
+      </tbody>
+    </table>
+
+    <h3><span class="tag mongo">MongoDB</span> heatmap_cells · info_reports · admin_activity · device_tokens</h3>
+    <table>
+      <thead><tr><th>Colección</th><th>PK</th><th>FK lógicas</th><th>Campos propios</th></tr></thead>
+      <tbody>
+        <tr><td><code>heatmap_cells</code></td><td><code>_id = "{AlertId}|{geohash}"</code></td><td><code>AlertId</code> → alerts (null=global)</td><td>Center Lat/Lng, AwarenessCount, InfoCount, WeightedIntensity, LastUpdated</td></tr>
+        <tr><td><code>info_reports</code></td><td><code>Id</code> (UUID)</td><td><code>AlertId</code> → alerts; <code>CitizenId</code></td><td>Lat, Lng, Description, PhotoUrl, ReportedAt</td></tr>
+        <tr><td><code>admin_activity</code></td><td><code>_id</code></td><td><code>AlertId</code> → alerts (nullable)</td><td>Kind, Title, Description, Timestamp</td></tr>
+        <tr><td><code>device_tokens</code></td><td><code>_id</code> = token</td><td>— (independiente)</td><td>RegisteredAt</td></tr>
+      </tbody>
+    </table>
+
+    <!-- ================= LINAJE ================= -->
+    <h2><span class="n">5</span>Linaje: cómo un mismo reporte recorre las tablas</h2>
+    <p>Esto explica la relación <strong>1:1 por <code>id</code></strong> (líneas punteadas del diagrama). Un único reporte ciudadano se materializa con el <strong>mismo UUID</strong> en varias estructuras:</p>
+    <pre class="flow">
+  El ciudadano envía 1 reporte tipo Info
+        │  (la API genera UN id UUID)
+        ▼
+  <b>CASSANDRA</b> — se escribe el MISMO id en 3 tablas (dual/triple-write):
+     · citizen_reports            (lectura por alerta)
+     · citizen_reports_by_time    (escaneo por día → heatmap)
+     · info_reports_sync          (staging, solo Info)
+        │
+        │  BackgroundService cada 15s (consistencia eventual)
+        ▼
+  <b>MONGODB</b> — conservando el MISMO id:
+     · info_reports               (Id = id del reporte)        ← InfoReportSyncService
+     · heatmap_cells              (agregado por geohash, ya no por id) ← HeatmapSyncService
+    </pre>
+    <div class="callout">
+      <span class="lbl">Dos tipos de "relación" conviviendo</span>
+      Por <strong>alertId</strong> es una relación clásica padre-hijo (1:N). Por <strong>id de reporte</strong> es <em>linaje de datos</em>: no relaciona entidades distintas, sino que sigue al <strong>mismo dato</strong> mientras se copia y transforma entre motores. En <code>heatmap_cells</code> el id del reporte ya se pierde (se agrega por celda), por eso ahí solo queda la relación por <code>AlertId</code>.
+    </div>
+  </div>
+
+  <footer>
+    SafeSight · Grupo 5 · Ingeniería de Datos II — 2026. Modelo entidad-relación lógico derivado del esquema real (Cassandra <code>CassandraSchema</code> + MongoDB <code>SafeSightDbContext</code>/índices). Las relaciones son lógicas (mantenidas por la aplicación); NoSQL no impone integridad referencial.
+  </footer>
+</div>
+</body>
+</html>

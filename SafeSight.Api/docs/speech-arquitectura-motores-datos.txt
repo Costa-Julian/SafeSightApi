@@ -1,0 +1,228 @@
+SPEECH — ARQUITECTURA DE PERSISTENCIA POLÍGLOTA (versión técnica)
+Cómo actúan los motores a medida que el sistema procesa los eventos
+Nivel universitario · Duración ~10-12 min
+================================================================================
+
+
+[APERTURA — UN SISTEMA ES UNA SECUENCIA DE EVENTOS]
+
+Quiero contar esta arquitectura no como un diagrama estático, sino como una
+línea de tiempo. Un sistema no "almacena datos": procesa eventos que ocurren en
+un orden, y cada uno de esos momentos le impone a la capa de persistencia una
+física distinta. Hay un momento en que se da de alta un caso; otro en que miles
+de personas reaccionan a la vez; y otro en que alguien necesita leer todo eso ya
+sintetizado para decidir. Mi tesis es simple: ninguno de esos tres momentos se
+sirve bien con el mismo motor, porque cada uno estresa una parte diferente de la
+mecánica de almacenamiento. Por eso la arquitectura es políglota, y voy a
+recorrerla evento por evento, mostrando qué hace el motor por dentro en cada uno.
+
+
+--------------------------------------------------------------------------------
+[MOMENTO 1 — SE CARGA UNA ALERTA: ESCRITURA DE UN DATO MAESTRO RICO]
+--------------------------------------------------------------------------------
+
+El primer evento es el alta de una alerta. Es una sola escritura, de baja
+frecuencia, pero de un dato complejo: un agregado con sub-estructuras anidadas
+—el perfil de la persona, su ubicación, atributos heterogéneos que no todos los
+casos comparten—. Y, sobre todo, es un dato que después vamos a consultar de
+muchas formas distintas: por estado, por quién lo emitió, por zona.
+
+Acá entra el motor documental. Técnicamente, almacena el agregado como un
+documento BSON —Binary JSON— bajo un storage engine de tipo WiredTiger. ¿Por qué
+importa esto? Porque WiredTiger indexa con árboles B+ y mantiene el "working set"
+—los documentos e índices más usados— en memoria, con control de concurrencia a
+nivel de documento. Eso nos da dos cosas que este momento necesita: primero,
+escribir todo el agregado en un único lugar contiguo, sin descomponerlo en cinco
+tablas y recomponerlo con joins; y segundo, crear índices secundarios arbitrarios
+—sobre el estado, sobre el emisor— para responder consultas ad-hoc en tiempo
+logarítmico.
+
+Y este es un punto técnico que quiero remarcar: el modelo documental permite
+"embeber" lo que siempre se lee junto. El perfil y la ubicación viven dentro del
+documento del caso, no en colecciones aparte. Eso elimina el join, que es la
+operación más cara y menos escalable del mundo relacional.
+
+¿Cómo se alinea la API con esto? Del lado documental usamos un ORM completo, con
+su patrón de change tracking y de mapeo objeto-documento. Lo elegante es que ese
+ORM modela el embedding de forma nativa: declaramos esas sub-estructuras como
+entidades "propiedad de" el agregado —owned entities— y el ORM las serializa
+dentro del mismo documento, sin tabla intermedia. Escribimos en C# con LINQ
+tipado, y el proveedor traduce eso a operaciones del motor. La impedancia entre el
+objeto del dominio y el documento almacenado es prácticamente cero. Para el dato
+maestro, rico y consultado de muchas maneras, esa alineación es exactamente la
+que queremos.
+
+
+--------------------------------------------------------------------------------
+[MOMENTO 2 — LA CIUDADANÍA RESPONDE EN MASA: INGESTA DE EVENTOS]
+--------------------------------------------------------------------------------
+
+Segundo evento, y todo cambia. Publicada la alerta, miles de personas responden
+casi simultáneamente: "estoy enterado", "lo vi acá". Es el caso opuesto al
+anterior: escrituras numerosísimas, concurrentes, en picos impredecibles, donde
+cada evento es pequeño pero perder uno es perder información valiosa. Si
+intentáramos absorber esto con el motor documental —o peor, con un relacional—, la
+contención por bloqueos y el costo de mantener índices en cada inserción nos
+fundiría bajo carga.
+
+Para este momento usamos el motor columnar distribuido, y conviene entender su
+"write path", porque es la razón de fondo por la que brilla acá. Está construido
+sobre una estructura LSM-tree —Log-Structured Merge tree—. Cuando llega una
+escritura, ocurren dos cosas y ninguna implica leer disco aleatoriamente:
+primero, el evento se anexa de forma secuencial a un commit log, que garantiza
+durabilidad; segundo, se inserta en una estructura en memoria llamada memtable.
+Y se confirma. No hay "read-before-write": el motor no necesita ir a buscar el
+dato anterior para escribir el nuevo. Cuando la memtable se llena, se vuelca a
+disco como un SSTable —un archivo inmutable, ordenado, que nunca se reescribe—.
+Más tarde, un proceso de compactación fusiona esos SSTables en segundo plano. El
+resultado es que las escrituras son esencialmente secuenciales y de costo
+constante: por eso un motor LSM sostiene volúmenes de escritura que un árbol B
+tradicional, que sí reescribe páginas en su lugar, no puede igualar.
+
+A eso se suma la topología. Es un anillo sin nodo maestro —masterless—: todos los
+nodos son pares y cualquiera acepta escrituras. La ubicación de cada evento la
+decide un particionador por consistent hashing, que mapea la clave de partición a
+un token del anillo. Esto elimina el punto único de falla del modelo
+maestro-esclavo y permite escalar horizontalmente: si agrego un nodo, el anillo
+redistribuye los rangos de tokens automáticamente, sin downtime. La durabilidad y
+disponibilidad se sostienen con un factor de replicación configurable y con
+mecanismos como el hinted handoff —si un réplica está caída, otro nodo guarda la
+escritura y se la entrega después— y el read repair, que reconcilia divergencias
+en la lectura. Y la consistencia es ajustable por operación: vía quórum puedo
+exigir más rigor en una lectura crítica sin sacrificar la disponibilidad general
+de la escritura.
+
+Pero el verdadero arte de este motor no está en la infraestructura, sino en el
+modelado, y acá hay que invertir el chip relacional. No se modela por entidad, se
+modela por consulta —query-first—. Y la pieza más delicada es el diseño de la
+clave primaria, que se compone de dos partes: la clave de partición, que decide en
+qué nodo vive el dato; y la clave de clustering, que decide cómo se ordenan
+físicamente las filas dentro de esa partición, ya escritas en disco en ese orden.
+Acá aparece el riesgo clásico: la partición caliente. Si usáramos como clave de
+partición solo el identificador de la alerta, todos los eventos de un caso viral
+caerían en una única partición, en un único nodo, y volveríamos a tener el cuello
+de botella. La solución es componer la clave con un bucket temporal —por ejemplo
+el día—, que dispersa los eventos de una misma alerta entre múltiples particiones
+y múltiples nodos. Es una decisión de modelado, no de hardware, y es la que
+sostiene el rendimiento bajo concurrencia extrema. Como contrapartida,
+denormalizamos: el mismo evento se escribe en más de una tabla, cada una tallada
+para un patrón de lectura distinto. La redundancia, pecado en el modelo
+relacional, acá es la estrategia.
+
+¿Cómo se alinea la API con este motor? Acá deliberadamente NO usamos un ORM de
+propósito general, y la razón es técnica: un ORM esconde justamente lo que más nos
+importa —la clave de partición, la denormalización, las escrituras múltiples—.
+Usamos el driver nativo del motor, con dos capacidades clave. La primera son los
+prepared statements: la sentencia CQL se parsea y planifica una sola vez, y luego
+se reejecuta con distintos parámetros, eliminando el overhead de parseo en cada
+una de las miles de escrituras. La segunda es el enrutamiento token-aware: el
+driver conoce el anillo y envía cada escritura directamente al nodo dueño de ese
+token, sin saltos intermedios. La API habla el lenguaje nativo del motor; está
+alineada con su física, no peleada con ella.
+
+
+--------------------------------------------------------------------------------
+[EL PUENTE — POR QUÉ NO MEZCLAR, Y CÓMO SE CONECTAN]
+--------------------------------------------------------------------------------
+
+Ahora, una pregunta honesta: si el motor columnar absorbió todos esos eventos,
+¿por qué no leerlos directamente de ahí para el tablero? Porque ese motor está
+optimizado para escribir y para leer por clave conocida, pero es deliberadamente
+malo en lo que un análisis necesita: no hace agregaciones arbitrarias, no permite
+filtrar por columnas que no son clave sin penalización, no tiene un motor de
+consulta ad-hoc. Pedirle eso sería usarlo contra su diseño.
+
+Entonces separamos los caminos. El de escritura termina en el motor columnar. El
+de lectura analítica vive en el documental. Y entre ambos hay procesos en segundo
+plano que leen los eventos crudos de forma incremental y construyen vistas
+pre-agregadas en el lado documental: un data mart. Dos garantías hacen esto
+robusto. Una es el avance por checkpoint: cada proceso recuerda hasta qué punto
+del tiempo procesó, así cada ciclo trabaja solo sobre el delta nuevo y puede
+reanudarse tras un reinicio sin reprocesar. La otra es la idempotencia: la
+materialización se hace con operaciones de upsert por clave, de modo que reejecutar
+un ciclo nunca duplica resultados. El precio es una latencia acotada y predecible
+entre que el evento se escribe y que aparece agregado: es el costo explícito de
+elegir consistencia eventual, que en el marco CAP es la decisión AP —privilegiar
+disponibilidad y tolerancia a particiones sobre consistencia inmediata—. Para un
+sistema que no puede dejar de recibir eventos, esa es la decisión rigurosa, no la
+cómoda.
+
+
+--------------------------------------------------------------------------------
+[MOMENTO 3 — EL ADMINISTRADOR VISUALIZA: LECTURA ANALÍTICA]
+--------------------------------------------------------------------------------
+
+Tercer evento. El administrador abre el tablero y necesita ver el panorama: la
+concentración geográfica, los conteos, la evolución. Lo que NO puede pasar es que
+esa consulta dispare un escaneo y una agregación sobre millones de eventos crudos
+en tiempo real; sería lento e impredecible.
+
+Y acá cierra el círculo del motor documental, ahora en su faceta de lectura. La
+consulta no recalcula nada: lee las vistas ya materializadas que el puente dejó
+preparadas. El costo pasa de "escanear y agrupar N eventos" a "leer K resultados
+pre-computados", con K muchísimo menor que N. Sobre esas vistas, el motor aporta
+su artillería de lectura: índices compuestos que cubren exactamente los patrones
+del tablero —incluso covered queries, donde el índice ya contiene todo lo que la
+consulta pide y ni siquiera hace falta tocar el documento—; el working set
+caliente en memoria, que evita el disco; y, cuando hace falta combinar o
+transformar, un pipeline de agregación por etapas que ejecuta la lógica analítica
+dentro del motor, cerca del dato, en lugar de traerlo todo a la aplicación. El
+mismo ORM del primer momento nos devuelve esto como objetos tipados, con sus
+consultas LINQ traducidas a operaciones nativas. El administrador percibe
+inmediatez; por debajo, esa inmediatez es el resultado de haber pagado el costo de
+la agregación antes, de forma asíncrona, y no en el instante de la consulta.
+
+
+--------------------------------------------------------------------------------
+[CIERRE — CADA MOTOR EN SU FÍSICA]
+--------------------------------------------------------------------------------
+
+Si recorremos la línea de tiempo, el patrón es claro. El alta de un dato maestro
+rico pide un modelo documental con embedding e índices flexibles. La avalancha de
+eventos concurrentes pide un motor LSM, masterless, particionado, que escribe de
+forma secuencial y sin lectura previa. Y la lectura analítica pide volver al
+documental, pero sobre vistas pre-agregadas servidas por índices y agregación. No
+es que tengamos dos bases "porque sí": es que cada momento del sistema estresa una
+mecánica de almacenamiento distinta, y elegimos el motor cuya física coincide con
+esa demanda.
+
+Y la capa de aplicación acompaña esa decisión en vez de aplanarla: del lado
+documental, un ORM completo que mapea el agregado y traduce LINQ; del lado
+columnar, el driver nativo con sentencias preparadas y enrutamiento consciente del
+anillo. No imponemos un único ORM para todo, porque eso traicionaría la física de
+alguno de los dos motores. Hablamos el dialecto nativo de cada uno.
+
+Esa es, en definitiva, la idea de fondo: la persistencia políglota no es coleccionar
+tecnologías, es entender que el almacenamiento tiene una física, que esa física
+cambia según el evento que el sistema esté procesando, y que la arquitectura
+madura es la que pone, en cada momento, el motor correcto y le habla en su propio
+idioma. Gracias.
+
+
+================================================================================
+SafeSight · Ingeniería de Datos II · G5
+
+Glosario rápido de los tecnicismos usados (por si te lo preguntan):
+- LSM-tree: estructura de escritura secuencial (commit log + memtable + SSTables
+  inmutables + compactación). Base del motor columnar; explica su alto throughput
+  de escritura.
+- SSTable / memtable / commit log: archivo inmutable ordenado en disco / buffer de
+  escritura en memoria / log de durabilidad ante caída.
+- Consistent hashing / token ring / vnodes: cómo el motor distribuye particiones
+  entre nodos y reequilibra al escalar.
+- Clave de partición vs clave de clustering: dónde vive la fila (nodo) vs cómo se
+  ordena físicamente dentro de la partición.
+- Hot partition / bucketing temporal: riesgo de concentrar carga en una partición
+  y su mitigación componiendo la clave con el tiempo.
+- Quórum / factor de replicación / hinted handoff / read repair: mecanismos de
+  consistencia ajustable y durabilidad del motor columnar.
+- WiredTiger / BSON / árbol B+ / working set: storage engine, formato binario,
+  índice y datos calientes en memoria del motor documental.
+- Aggregation pipeline / covered query / índice compuesto: herramientas de lectura
+  analítica del motor documental.
+- Owned entities (embedding) / change tracking / LINQ: cómo el ORM documental mapea
+  el agregado anidado y traduce las consultas.
+- Prepared statement / token-aware routing: cómo el driver columnar evita reparsear
+  y enruta cada escritura al nodo dueño del token.
+- CAP / AP / consistencia eventual: marco de la decisión de privilegiar
+  disponibilidad y el puente de sincronización con checkpoint e idempotencia.

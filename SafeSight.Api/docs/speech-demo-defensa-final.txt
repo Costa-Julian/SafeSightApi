@@ -1,0 +1,198 @@
+SPEECH — DEFENSA FINAL / VIDEO DEMO · PROYECTO SAFESIGHT
+Ingeniería de Datos II · G5 · Duración objetivo ~10 minutos
+================================================================================
+Tono: profesional, técnico y persuasivo. El hilo conductor es una validación
+empírica: la teoría de la materia, aplicada correctamente, produce un sistema
+listo para producción.
+
+Las marcas [EN PANTALLA] indican qué mostrar mientras se narra (no se leen).
+================================================================================
+
+
+--------------------------------------------------------------------------------
+1) INTRODUCCIÓN Y CONTEXTO — POR QUÉ NoSQL (Unidad I)
+--------------------------------------------------------------------------------
+[EN PANTALLA: portada del proyecto / mapa de Argentina o titular sobre personas
+desaparecidas]
+
+Buenas. Vamos a presentar SafeSight, una plataforma de búsqueda colaborativa de
+personas desaparecidas. Pero más que mostrar pantallas, queremos demostrar algo:
+que las decisiones de arquitectura de datos que tomamos no son arbitrarias, sino
+la respuesta directa a la naturaleza del problema. Y al final, lo vamos a probar
+con números.
+
+El problema parte de un hecho documentado: en la búsqueda de personas existe lo
+que los protocolos de rescate llaman las "horas doradas". La probabilidad de
+hallazgo cae de forma exponencial con el tiempo. Cada minuto que pasa, el rastro
+se degrada y la dispersión geográfica crece. Esto define una exigencia técnica
+brutal: el sistema tiene que estar disponible siempre, y tiene que absorber
+información en el instante exacto en que más gente está reaccionando.
+
+¿Y cómo es esa información? Es exactamente lo que un modelo relacional sufre:
+son volúmenes masivos de eventos concurrentes —miles de ciudadanos respondiendo a
+la vez a una misma alerta— y son datos heterogéneos y no estructurados: texto
+libre, fotografías, coordenadas GPS. Un esquema relacional rígido nos obligaría a
+normalizar en múltiples tablas, a pagar joins costosos, y a sufrir contención por
+bloqueos justo en el pico de carga. Y para escalar, solo nos ofrecería crecer
+hacia arriba —un servidor más grande—, con techo físico y costo exponencial.
+
+Por eso elegimos NoSQL. No por moda, sino porque la física del problema —alta
+concurrencia de escritura, datos variables y necesidad de escalado horizontal—
+coincide exactamente con aquello para lo que las bases NoSQL fueron diseñadas.
+
+
+--------------------------------------------------------------------------------
+2) ARQUITECTURA POLÍGLOTA — CASSANDRA + MONGODB (Unidades II y III)
+--------------------------------------------------------------------------------
+[EN PANTALLA: diagrama de arquitectura — móvil/web → API → Cassandra + MongoDB,
+con los background services en el medio]
+
+Ahora bien, "NoSQL" no es una sola cosa. Y acá está la decisión central: no
+usamos un único motor, usamos persistencia políglota. Porque el sistema tiene dos
+cargas de trabajo opuestas, y le asignamos a cada una el motor diseñado para ella.
+
+La primera carga es la INGESTA. Cuando se publica una alerta, miles de personas
+mandan su "estoy enterado" y sus avistamientos casi simultáneamente. Para esto
+usamos Apache Cassandra. La razón técnica de fondo es su motor de escritura
+basado en LSM-tree: cada evento se anexa de forma secuencial a un commit log y se
+guarda en una estructura en memoria, la memtable, y se confirma. No hay
+"read-before-write": Cassandra no necesita leer el dato anterior para escribir el
+nuevo. Esa escritura secuencial en memoria es la que le permite sostener
+volúmenes que un árbol B tradicional no aguanta. Además es masterless —un anillo
+de nodos pares, sin punto único de falla— y escala horizontalmente por consistent
+hashing: si agrego un nodo, el anillo se reequilibra solo.
+
+La segunda carga es la CONSULTA RICA y analítica. Para eso usamos MongoDB, que
+con su modelo documental absorbe la heterogeneidad de los datos —embebe el perfil
+de la persona y su ubicación en un mismo documento, sin joins— y aporta su
+pipeline de agregación y su soporte geoespacial para construir los mapas de calor,
+que son el corazón analítico del sistema.
+
+[EN PANTALLA: el CREATE TABLE de citizen_reports, resaltando la PRIMARY KEY]
+
+Dos conceptos teóricos guiaron el modelado en Cassandra. El primero: modelado
+dirigido por consultas, "query-first". A diferencia del relacional, no
+normalizamos entidades; partimos de las consultas y diseñamos las tablas para
+servirlas, incluso duplicando datos a propósito. El segundo, y crítico: el diseño
+de la clave de partición para evitar las "hot partitions". Si usáramos solo el ID
+de la alerta como clave, todos los reportes de un caso viral caerían en una única
+partición y en un único nodo: el cuello de botella que queríamos evitar. La
+solución fue componer la clave con un time bucket diario. Así, los reportes de una
+misma alerta se reparten entre múltiples particiones y múltiples nodos. Es una
+decisión de modelado, no de hardware, y es la que sostiene el rendimiento bajo
+carga extrema.
+
+
+--------------------------------------------------------------------------------
+3) TEOREMA CAP Y CONSISTENCIA (Unidad IV)
+--------------------------------------------------------------------------------
+[EN PANTALLA: triángulo CAP, resaltando A y P]
+
+Esto nos lleva al teorema CAP. Todo sistema distribuido, ante una partición de
+red —que no es una excepción, es una certeza estadística— debe elegir entre
+consistencia y disponibilidad. No se pueden tener ambas.
+
+Un sistema CP, consistente, ante una partición se bloquea hasta resincronizar.
+Para un banco, es lo correcto. Para nosotros, es inaceptable: un sistema que deja
+de aceptar reportes durante una emergencia es un sistema que pierde, justo en las
+horas doradas, la información que podría encontrar a la persona.
+
+Por eso elegimos AP: priorizamos Disponibilidad y Tolerancia a Particiones, con
+un modelo de consistencia eventual. El sistema garantiza estar siempre operativo
+para recibir eventos, y acepta que la propagación de esos datos hacia la capa
+analítica demore unos pocos segundos. Quiero ser claro en esto, porque suele
+malinterpretarse: la consistencia eventual no es una debilidad, es una decisión
+de diseño. Cuando el valor de un dato no depende de que todos lo vean al instante,
+sino de que NO SE PIERDA, elegir disponibilidad es la decisión rigurosa. Ningún
+reporte ciudadano se descarta: primero se garantiza la escritura, después se
+propaga.
+
+
+--------------------------------------------------------------------------------
+4) EVIDENCIA: STRESS TEST Y PERFORMANCE (Unidades V y VI)
+--------------------------------------------------------------------------------
+[EN PANTALLA: consola de k6 con los resultados finales]
+
+Y acá es donde dejamos de hablar de teoría y mostramos evidencia. Sometimos la
+arquitectura a una prueba de estrés con k6: un bombardeo de dos minutos,
+escalando hasta 200 usuarios virtuales concurrentes atacando la API sin descanso.
+Distribuimos la carga de forma realista: el 90% fue ingesta a Cassandra
+—ciudadanos enviando avistamientos a altísima velocidad— y el 10% fue a MongoDB,
+simulando la creación de alertas, que es mucho más pesada porque incluye datos
+complejos y formularios multipart.
+
+Los resultados validan cada decisión que tomamos.
+
+Primero, VELOCIDAD: procesamos más de 173.000 peticiones en dos minutos, unas
+1.400 peticiones por segundo. Y no solo las absorbimos: respondimos rápido. El
+percentil 95 de latencia fue de apenas 31 milisegundos. Es decir, el 95% de las
+peticiones se respondió en menos de 31 milisegundos, bajo carga máxima.
+
+Segundo, y para mí lo más importante: CERO ERRORES. Cero. Las más de 173.000
+peticiones tuvieron 100% de éxito. Ni la ingesta masiva en Cassandra ni la
+creación pesada de alertas en Mongo fallaron una sola vez. Ninguna base se cayó.
+Esto es la confirmación empírica de nuestra elección AP: el sistema no perdió ni
+un evento.
+
+[EN PANTALLA: gráficos de Yacht — CPU y RAM en el tiempo]
+
+Tercero, el CONSUMO DE RECURSOS, que valida nuestra estrategia de escalamiento
+horizontal. Durante todo el pico de 200 usuarios, el consumo se mantuvo bajo y
+estable, sin saturación ni picos abruptos. La CPU de Cassandra —que manejó el 90%
+del tráfico— no superó el 38%, y la de MongoDB se mantuvo por debajo del 20%. En
+memoria, MongoDB se mantuvo plano en torno al 3%, y Cassandra alrededor del 11%,
+porque usa su memtable en memoria justamente para procesar esas inserciones
+rápidas. Sin fugas de memoria, sin degradación a lo largo del tiempo.
+
+Leamos lo que esto significa: aguantamos 1.400 peticiones por segundo con cero
+errores usando menos del 40% de un solo nodo. Eso quiere decir que todavía había
+muchísimo margen, y que cuando el sistema necesite crecer, no hace falta un
+servidor gigante: alcanza con sumar nodos. La escritura secuencial en memoria de
+Cassandra y el escalado horizontal no fueron una promesa teórica; los medimos.
+
+
+--------------------------------------------------------------------------------
+5) CONCLUSIÓN TÉCNICA
+--------------------------------------------------------------------------------
+[EN PANTALLA: el mapa de calor renderizado / heatmap_cells en MongoDB]
+
+Para cerrar, falta unir los dos mundos. ¿Cómo servimos analítica en tiempo real
+—los mapas de calor— sin frenar esa ingesta tan veloz? Acá está la pieza final:
+no leemos los datos crudos para el análisis. Procesos en segundo plano leen los
+eventos de Cassandra de forma incremental, mediante checkpoints, y construyen en
+MongoDB un Data Mart pre-agregado: celdas de calor ya calculadas. La consulta del
+organismo no escanea millones de reportes; lee un puñado de celdas ya resueltas.
+El costo analítico se paga antes, de forma asíncrona, nunca en el momento de la
+consulta. Por eso la ingesta puede volar mientras el tablero responde al instante.
+
+En síntesis: partimos de un problema social crítico con una exigencia técnica
+concreta —disponibilidad y velocidad en las horas doradas—. Lo tradujimos en una
+arquitectura políglota: Cassandra para no perder ningún evento bajo carga masiva,
+MongoDB como Data Mart para servir analítica rica sin degradar la ingesta. Lo
+fundamentamos en el teorema CAP eligiendo disponibilidad y consistencia eventual.
+Y lo validamos empíricamente: 173.000 peticiones, cero errores, 31 milisegundos
+de latencia y los servidores casi sin transpirar.
+
+La teoría de la materia, aplicada con criterio, no quedó en el papel: produjo un
+sistema medido, robusto y listo para producción. Gracias.
+
+
+================================================================================
+SAFESIGHT · G5 · INGENIERÍA DE DATOS II · 2026
+
+CHEAT-SHEET DE NÚMEROS (para no dudar en cámara):
+  · Duración test: 2 min · 200 usuarios virtuales (VUs) concurrentes · k6
+  · Carga: 90% Cassandra (avistamientos) / 10% Mongo (alertas multipart)
+  · Throughput: +173.000 peticiones (~1.400 req/seg)
+  · Errores: 0 (100% de éxito) — ninguna base se cayó
+  · Latencia: p95 = 31 ms (95% de las requests bajo 31 ms)
+  · CPU: Cassandra < 38% · MongoDB < 20% (sin picos, estable)
+  · RAM: MongoDB ~3% · Cassandra ~11% (memtable) — sin memory leaks
+  · Monitoreo de contenedores: Yacht
+
+MAPEO TEÓRICO (por si preguntan):
+  · Unidad I    → NoSQL vs relacional · datos no estructurados · concurrencia
+  · Unidad II-III → políglota · Cassandra (LSM, masterless) + Mongo (documental,
+                    agregación, geo) · query-first · time bucket vs hot partitions
+  · Unidad IV   → CAP → AP · consistencia eventual · no perder eventos
+  · Unidad V-VI → stress test (k6) · performance · escalado horizontal · Data Mart

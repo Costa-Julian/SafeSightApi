@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SafeSight — Flujo de datos a la base (caso Maitena · Merlo, Bs. As.)</title>
+<style>
+  :root{
+    --ink:#1a1f2b; --muted:#6b7685; --line:#d9dee6; --bg:#fff; --paper:#f6f7f9;
+    --accent:#1f5fae; --accent-soft:#eaf1fb;
+    --cass:#b03060; --cass-bg:#fbeef3; --mongo:#2e7d4f; --mongo-bg:#eaf6ee;
+    --disk:#5b7fb0; --disk-bg:#eef3fa; --warn:#9a6b00; --warn-bg:#fdf5e3;
+    --code-bg:#1e2330; --code-ink:#e6e9ef;
+    --k:#7cc7ff; --s:#b7e6a3; --num:#f3b86b; --null:#d98a8a;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-size:15.5px;line-height:1.62;}
+  .page{max-width:1000px;margin:0 auto;background:var(--bg);padding:0 0 70px;}
+  header.cover{padding:40px 46px 26px;border-bottom:3px solid var(--accent);}
+  .kicker{text-transform:uppercase;letter-spacing:.14em;font-size:11.5px;color:var(--accent);font-weight:700;}
+  h1{font-size:29px;margin:8px 0 4px;letter-spacing:-.01em;}
+  h1 small{display:block;font-size:15.5px;color:var(--muted);font-weight:400;margin-top:6px;}
+  .wrap{padding:0 46px;}
+  h2{font-size:20px;margin:40px 0 6px;padding-top:18px;border-top:1px solid var(--line);}
+  h2 .n{display:inline-block;min-width:30px;height:30px;line-height:30px;text-align:center;background:var(--accent);color:#fff;border-radius:50%;font-size:14px;font-weight:800;margin-right:10px;}
+  h3{font-size:15.5px;margin:22px 0 4px;}
+  p{margin:10px 0;}
+  code{font-family:"SF Mono",Menlo,Consolas,monospace;font-size:.85em;background:#eef1f5;padding:1px 5px;border-radius:4px;color:#2b3a55;}
+  .tag{font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px;display:inline-block;}
+  .tag.cass{background:var(--cass-bg);color:var(--cass);border:1px solid #e7b9cc;}
+  .tag.mongo{background:var(--mongo-bg);color:var(--mongo);border:1px solid #b8ddc4;}
+  .tag.disk{background:var(--disk-bg);color:var(--disk);border:1px solid #b9cce4;}
+  .tag.req{background:#ede9fb;color:#5b3fb0;border:1px solid #cdc2ee;}
+  .step-into{font-family:"SF Mono",monospace;font-size:12px;color:var(--muted);margin:14px 0 4px;}
+  pre{background:var(--code-bg);color:var(--code-ink);border-radius:10px;padding:14px 16px;overflow-x:auto;
+    font-family:"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;font-size:12.6px;line-height:1.5;margin:8px 0;}
+  pre .k{color:var(--k);} pre .s{color:var(--s);} pre .num{color:var(--num);} pre .null{color:var(--null);} pre .c{color:#7f8aa0;font-style:italic;}
+  pre.cql{background:#2a1a22;border-left:4px solid var(--cass);}
+  .lbl-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:18px 0 2px;}
+  .arrow{color:var(--muted);font-weight:700;}
+  .callout{border-left:4px solid var(--accent);background:var(--accent-soft);padding:11px 15px;border-radius:0 8px 8px 0;margin:16px 0;font-size:14px;}
+  .callout.warn{border-left-color:var(--warn);background:var(--warn-bg);}
+  .callout.cass{border-left-color:var(--cass);background:var(--cass-bg);}
+  .callout.mongo{border-left-color:var(--mongo);background:var(--mongo-bg);}
+  .callout .lbl{font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:3px;}
+  pre.flow{background:#fbfcfe;border:1px solid var(--line);color:var(--ink);font-size:12px;line-height:1.4;}
+  pre.flow b{color:var(--accent);}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13px;}
+  th,td{border:1px solid var(--line);padding:6px 10px;text-align:left;}
+  th{background:var(--paper);font-weight:700;}
+  .meta{display:grid;grid-template-columns:max-content 1fr;gap:3px 16px;font-size:13.5px;margin:14px 0;}
+  .meta dt{color:var(--muted);font-weight:600;} .meta dd{margin:0;}
+  footer{font-size:12.5px;color:var(--muted);padding:26px 46px 0;border-top:1px solid var(--line);margin-top:40px;}
+  @media print{ body{background:#fff;} pre{white-space:pre-wrap;} }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="cover">
+    <div class="kicker">SafeSight · Ingeniería de Datos II · G5</div>
+    <h1>Cómo viaja la información hasta la base
+      <small>Recorrido extremo a extremo de un caso real: «Maitena», desaparición en Merlo, Buenos Aires</small>
+    </h1>
+  </header>
+
+  <div class="wrap">
+
+    <div class="callout warn">
+      <span class="lbl">Nota sobre los datos</span>
+      Se usa un <strong>escenario realista</strong> (el nombre <em>Maitena</em> y la localidad de <strong>Merlo, Provincia de Buenos Aires</strong>) para que los ejemplos no sean «datos fantasma». Los datos personales puntuales (apellido, edad, descripción, coordenadas exactas, identificadores) son <strong>ilustrativos y de demostración académica</strong>: no se afirman como información verificada de una persona real. Los <code>_id</code>/<code>UUID</code> son ejemplos coherentes entre sí a lo largo de todo el recorrido.
+    </div>
+
+    <h2><span class="n">0</span>El caso y el recorrido</h2>
+    <dl class="meta">
+      <dt>Persona</dt><dd>Maitena (NNyA, 16 años — ejemplo)</dd>
+      <dt>Lugar</dt><dd>Centro de Merlo, Provincia de Buenos Aires (~ -34.6653, -58.7283)</dd>
+      <dt>Emite la alerta</dt><dd>Perfil <strong>agente</strong> desde la app móvil</dd>
+      <dt>Participan</dt><dd>Ciudadanos: confirman «estoy enterado» y aportan información</dd>
+      <dt><code>alertId</code></dt><dd><code>6669a1f4c3b2a14d7e8f0021</code> (se propaga a todo)</dd>
+    </dl>
+
+    <pre class="flow">
+ (1) Agente crea alerta ─▶ <b>MONGODB</b> alerts  (+ admin_activity, + foto en disco, + push)
+ (2) Ciudadano "enterado" ─▶ <b>CASSANDRA</b> citizen_reports + citizen_reports_by_time
+ (3) Ciudadano aporta info ─▶ <b>CASSANDRA</b> (las 2 anteriores) + info_reports_sync
+ (4) cada 15s, sync ────────▶ <b>MONGODB</b> heatmap_cells (agregado) + info_reports (migrado)
+    </pre>
+
+    <!-- ============ ETAPA 1 ============ -->
+    <h2><span class="n">1</span>El agente emite la alerta</h2>
+    <div class="lbl-row"><span class="tag req">REQUEST · multipart/form-data</span><span class="arrow">→</span><code>POST /api/alerts</code></div>
+    <p>La app móvil (perfil agente) envía los datos de Maitena y la foto. Como es <code>multipart</code>, los campos viajan como <em>form-data</em> (se representan aquí como JSON para legibilidad):</p>
+<pre><span class="c">// lo que envía la app (form-data)</span>
+{
+  <span class="k">"firstName"</span>: <span class="s">"Maitena"</span>,
+  <span class="k">"lastName"</span>: <span class="s">"Rodríguez"</span>,
+  <span class="k">"age"</span>: <span class="num">16</span>,
+  <span class="k">"physicalDescription"</span>: <span class="s">"1,60 m, contextura delgada, cabello castaño largo. Vestía campera de jean azul y mochila negra."</span>,
+  <span class="k">"situation"</span>: <span class="s">"Vista por última vez al salir del colegio en el centro de Merlo; no regresó a su domicilio."</span>,
+  <span class="k">"latitude"</span>: <span class="num">-34.6653</span>,
+  <span class="k">"longitude"</span>: <span class="num">-58.7283</span>,
+  <span class="k">"disappearanceDate"</span>: <span class="s">"2026-06-10T13:30:00Z"</span>,
+  <span class="k">"emitterId"</span>: <span class="num">2</span>,                <span class="c">// 2 = entidad / agente</span>
+  <span class="k">"photo"</span>: <span class="s">"maitena.jpg"</span>           <span class="c">// archivo binario</span>
+}</pre>
+
+    <div class="lbl-row"><span class="tag disk">DISCO</span><span class="arrow">→</span> la foto se guarda y se obtiene su URL</div>
+    <pre><span class="c">// PhotoStorageService → wwwroot/photos/</span>
+<span class="s">"/photos/8f3c1a7e-4d22-49b0-bb1e-9c0f2a6d5e34.jpg"</span></pre>
+
+    <div class="lbl-row"><span class="tag mongo">MONGODB · inserta en <code>alerts</code></span></div>
+    <p>El servicio arma el documento <strong>anidado</strong> (la persona y la ubicación se embeben) y Mongo genera el <code>_id</code>. <strong>Este es el dato que queda persistido:</strong></p>
+<pre><span class="c">// colección: alerts</span>
+{
+  <span class="k">"_id"</span>: <span class="s">"6669a1f4c3b2a14d7e8f0021"</span>,        <span class="c">// ← alertId (lo genera Mongo)</span>
+  <span class="k">"MissingPerson"</span>: {                          <span class="c">// sub-documento embebido</span>
+    <span class="k">"FirstName"</span>: <span class="s">"Maitena"</span>,
+    <span class="k">"LastName"</span>: <span class="s">"Rodríguez"</span>,
+    <span class="k">"Age"</span>: <span class="num">16</span>,
+    <span class="k">"PhysicalDescription"</span>: <span class="s">"1,60 m, contextura delgada, cabello castaño largo..."</span>,
+    <span class="k">"PhotoUrl"</span>: <span class="s">"/photos/8f3c1a7e-4d22-49b0-bb1e-9c0f2a6d5e34.jpg"</span>
+  },
+  <span class="k">"Situation"</span>: <span class="s">"Vista por última vez al salir del colegio en el centro de Merlo..."</span>,
+  <span class="k">"LastKnownLocation"</span>: {                      <span class="c">// sub-documento embebido</span>
+    <span class="k">"Latitude"</span>: <span class="num">-34.6653</span>,
+    <span class="k">"Longitude"</span>: <span class="num">-58.7283</span>
+  },
+  <span class="k">"DisappearanceDate"</span>: <span class="s">"2026-06-10T13:30:00Z"</span>,
+  <span class="k">"EmitterId"</span>: <span class="num">2</span>,
+  <span class="k">"EmittedAt"</span>: <span class="s">"2026-06-10T15:05:22Z"</span>,         <span class="c">// momento del alta (UTC)</span>
+  <span class="k">"Status"</span>: <span class="s">"Active"</span>,
+  <span class="k">"ResolvedAt"</span>: <span class="null">null</span>
+}</pre>
+
+    <div class="lbl-row"><span class="tag mongo">MONGODB · inserta en <code>admin_activity</code></span></div>
+<pre><span class="c">// colección: admin_activity (feed del panel)</span>
+{
+  <span class="k">"_id"</span>: <span class="s">"5b1d0f2a-7c44-4e9a-8a10-2f6b9d1c3e77"</span>,
+  <span class="k">"Kind"</span>: <span class="s">"AlertCreated"</span>,
+  <span class="k">"Title"</span>: <span class="s">"Nueva alerta emitida"</span>,
+  <span class="k">"Description"</span>: <span class="s">"Se emitió una alerta para Maitena Rodríguez (16 años)."</span>,
+  <span class="k">"Timestamp"</span>: <span class="s">"2026-06-10T15:05:22Z"</span>,
+  <span class="k">"AlertId"</span>: <span class="s">"6669a1f4c3b2a14d7e8f0021"</span>
+}</pre>
+    <p class="step-into">+ se dispara una notificación push (FCM) a todos los <code>device_tokens</code> registrados.</p>
+
+    <!-- ============ ETAPA 2 ============ -->
+    <h2><span class="n">2</span>Un ciudadano confirma «estoy enterado» (avistamiento)</h2>
+    <div class="lbl-row"><span class="tag req">REQUEST · application/json</span><span class="arrow">→</span><code>POST /api/reports/awareness</code></div>
+<pre><span class="c">// el ciudadano solo aporta su ubicación y el momento</span>
+{
+  <span class="k">"alertId"</span>: <span class="s">"6669a1f4c3b2a14d7e8f0021"</span>,
+  <span class="k">"latitude"</span>: <span class="num">-34.6671</span>,
+  <span class="k">"longitude"</span>: <span class="num">-58.7259</span>,
+  <span class="k">"reportedAt"</span>: <span class="s">"2026-06-10T16:20:00Z"</span>
+}</pre>
+
+    <p>La API genera un <code>id</code> (UUID) y ejecuta un <strong>dual-write</strong> en Cassandra. El <code>time_bucket</code> sale de la fecha (<code>2026-06-10</code>). Como es <em>Awareness</em> (<code>type=0</code>), los campos de info quedan en <code>null</code>:</p>
+
+    <div class="lbl-row"><span class="tag cass">CASSANDRA · inserta en <code>citizen_reports</code></span></div>
+<pre class="cql"><span class="c">-- INSERT real (CQL) que ejecuta el repositorio</span>
+INSERT INTO safesight.citizen_reports
+  (alert_id, time_bucket, reported_at, id, type,
+   citizen_id, latitude, longitude, description, photo_url)
+VALUES
+  (<span class="s">'6669a1f4c3b2a14d7e8f0021'</span>, <span class="s">'2026-06-10'</span>, <span class="s">'2026-06-10T16:20:00Z'</span>,
+   <span class="s">a1b2c3d4-0001-4aaa-9bbb-1c2d3e4f5a60</span>, <span class="num">0</span>,
+   <span class="null">null</span>, <span class="num">-34.6671</span>, <span class="num">-58.7259</span>, <span class="null">null</span>, <span class="null">null</span>);</pre>
+<pre><span class="c">// la fila resultante, vista como JSON</span>
+{
+  <span class="k">"alert_id"</span>: <span class="s">"6669a1f4c3b2a14d7e8f0021"</span>,
+  <span class="k">"time_bucket"</span>: <span class="s">"2026-06-10"</span>,
+  <span class="k">"reported_at"</span>: <span class="s">"2026-06-10T16:20:00Z"</span>,
+  <span class="k">"id"</span>: <span class="s">"a1b2c3d4-0001-4aaa-9bbb-1c2d3e4f5a60"</span>,
+  <span class="k">"type"</span>: <span class="num">0</span>,                          <span class="c">// 0 = Awareness</span>
+  <span class="k">"citizen_id"</span>: <span class="null">null</span>, <span class="k">"description"</span>: <span class="null">null</span>, <span class="k">"photo_url"</span>: <span class="null">null</span>,
+  <span class="k">"latitude"</span>: <span class="num">-34.6671</span>, <span class="k">"longitude"</span>: <span class="num">-58.7259</span>
+}</pre>
+
+    <div class="lbl-row"><span class="tag cass">CASSANDRA · inserta en <code>citizen_reports_by_time</code></span></div>
+    <p>Copia espejo (sin descripción/foto) para que el sync pueda escanear por día:</p>
+<pre>{
+  <span class="k">"time_bucket"</span>: <span class="s">"2026-06-10"</span>,         <span class="c">// ← partition key (solo el día)</span>
+  <span class="k">"reported_at"</span>: <span class="s">"2026-06-10T16:20:00Z"</span>,
+  <span class="k">"alert_id"</span>: <span class="s">"6669a1f4c3b2a14d7e8f0021"</span>,
+  <span class="k">"id"</span>: <span class="s">"a1b2c3d4-0001-4aaa-9bbb-1c2d3e4f5a60"</span>,
+  <span class="k">"type"</span>: <span class="num">0</span>, <span class="k">"latitude"</span>: <span class="num">-34.6671</span>, <span class="k">"longitude"</span>: <span class="num">-58.7259</span>
+}</pre>
+    <div class="callout cass">
+      <span class="lbl">Awareness = 2 escrituras</span>
+      Un avistamiento NO escribe en <code>info_reports_sync</code> (esa tabla es solo para reportes con información). Responde 200 al instante; el aporte impactará el mapa de calor en el próximo ciclo de sync.
+    </div>
+
+    <!-- ============ ETAPA 3 ============ -->
+    <h2><span class="n">3</span>Otro ciudadano aporta información concreta (con foto)</h2>
+    <div class="lbl-row"><span class="tag req">REQUEST · multipart/form-data</span><span class="arrow">→</span><code>POST /api/reports/info</code></div>
+<pre>{
+  <span class="k">"alertId"</span>: <span class="s">"6669a1f4c3b2a14d7e8f0021"</span>,
+  <span class="k">"citizenId"</span>: <span class="s">"cit-9a4f2b7e"</span>,        <span class="c">// id del ciudadano (generado por la app)</span>
+  <span class="k">"latitude"</span>: <span class="num">-34.6680</span>,
+  <span class="k">"longitude"</span>: <span class="num">-58.7271</span>,
+  <span class="k">"description"</span>: <span class="s">"La vi subir a un colectivo de la línea 720 en la estación de Merlo cerca de las 14h."</span>,
+  <span class="k">"reportedAt"</span>: <span class="s">"2026-06-10T16:45:00Z"</span>,
+  <span class="k">"photo"</span>: <span class="s">"avistamiento.jpg"</span>
+}</pre>
+
+    <p>Ahora es <em>Info</em> (<code>type=1</code>): se guarda la foto y se ejecuta un <strong>triple-write</strong>. Las tres filas comparten el mismo <code>id</code> de reporte:</p>
+
+    <div class="lbl-row"><span class="tag disk">DISCO</span><span class="arrow">→</span> <code>"/photos/c7e0b9a1-3f54-4d8a-9e21-7b6c5d4e3f20.jpg"</code></div>
+
+    <div class="lbl-row"><span class="tag cass">CASSANDRA · <code>citizen_reports</code></span></div>
+<pre>{
+  <span class="k">"alert_id"</span>: <span class="s">"6669a1f4c3b2a14d7e8f0021"</span>,
+  <span class="k">"time_bucket"</span>: <span class="s">"2026-06-10"</span>,
+  <span class="k">"reported_at"</span>: <span class="s">"2026-06-10T16:45:00Z"</span>,
+  <span class="k">"id"</span>: <span class="s">"b2c1d4e5-0002-4b8c-9d0e-1f2a3b4c5d6e"</span>,
+  <span class="k">"type"</span>: <span class="num">1</span>,                          <span class="c">// 1 = Info</span>
+  <span class="k">"citizen_id"</span>: <span class="s">"cit-9a4f2b7e"</span>,
+  <span class="k">"latitude"</span>: <span class="num">-34.6680</span>, <span class="k">"longitude"</span>: <span class="num">-58.7271</span>,
+  <span class="k">"description"</span>: <span class="s">"La vi subir a un colectivo de la línea 720..."</span>,
+  <span class="k">"photo_url"</span>: <span class="s">"/photos/c7e0b9a1-3f54-4d8a-9e21-7b6c5d4e3f20.jpg"</span>
+}</pre>
+
+    <div class="lbl-row"><span class="tag cass">CASSANDRA · <code>citizen_reports_by_time</code></span> <span style="color:var(--muted);font-size:12px;">(espejo liviano, sin descripción/foto)</span></div>
+<pre>{ <span class="k">"time_bucket"</span>: <span class="s">"2026-06-10"</span>, <span class="k">"reported_at"</span>: <span class="s">"2026-06-10T16:45:00Z"</span>,
+  <span class="k">"alert_id"</span>: <span class="s">"6669a1f4c3b2a14d7e8f0021"</span>, <span class="k">"id"</span>: <span class="s">"b2c1d4e5-0002-4b8c-9d0e-1f2a3b4c5d6e"</span>,
+  <span class="k">"type"</span>: <span class="num">1</span>, <span class="k">"latitude"</span>: <span class="num">-34.6680</span>, <span class="k">"longitude"</span>: <span class="num">-58.7271</span> }</pre>
+
+    <div class="lbl-row"><span class="tag cass">CASSANDRA · <code>info_reports_sync</code></span> <span style="color:var(--muted);font-size:12px;">(staging, SOLO Info — lo leerá el sync)</span></div>
+<pre>{
+  <span class="k">"time_bucket"</span>: <span class="s">"2026-06-10"</span>,
+  <span class="k">"reported_at"</span>: <span class="s">"2026-06-10T16:45:00Z"</span>,
+  <span class="k">"id"</span>: <span class="s">"b2c1d4e5-0002-4b8c-9d0e-1f2a3b4c5d6e"</span>,
+  <span class="k">"alert_id"</span>: <span class="s">"6669a1f4c3b2a14d7e8f0021"</span>,
+  <span class="k">"citizen_id"</span>: <span class="s">"cit-9a4f2b7e"</span>,
+  <span class="k">"latitude"</span>: <span class="num">-34.6680</span>, <span class="k">"longitude"</span>: <span class="num">-58.7271</span>,
+  <span class="k">"description"</span>: <span class="s">"La vi subir a un colectivo de la línea 720..."</span>,
+  <span class="k">"photo_url"</span>: <span class="s">"/photos/c7e0b9a1-3f54-4d8a-9e21-7b6c5d4e3f20.jpg"</span>
+}</pre>
+
+    <!-- ============ ETAPA 4 ============ -->
+    <h2><span class="n">4</span>El pipeline materializa los datos en MongoDB (≈15 s después)</h2>
+    <p>Los <code>BackgroundService</code> leen desde su checkpoint y producen el dato listo para consulta. <strong>Esto NO ocurre en el request del ciudadano</strong>, sino en el ciclo de sincronización.</p>
+
+    <div class="lbl-row"><span class="tag mongo">MONGODB · <code>info_reports</code></span> <span style="color:var(--muted);font-size:12px;">(InfoReportSyncService migra desde <code>info_reports_sync</code>, conserva el <code>Id</code>)</span></div>
+<pre><span class="c">// colección: info_reports — lo consume la app para mostrar el detalle</span>
+{
+  <span class="k">"_id"</span>: <span class="s">"b2c1d4e5-0002-4b8c-9d0e-1f2a3b4c5d6e"</span>,   <span class="c">// = mismo id del reporte</span>
+  <span class="k">"AlertId"</span>: <span class="s">"6669a1f4c3b2a14d7e8f0021"</span>,
+  <span class="k">"CitizenId"</span>: <span class="s">"cit-9a4f2b7e"</span>,
+  <span class="k">"Latitude"</span>: <span class="num">-34.6680</span>, <span class="k">"Longitude"</span>: <span class="num">-58.7271</span>,
+  <span class="k">"Description"</span>: <span class="s">"La vi subir a un colectivo de la línea 720..."</span>,
+  <span class="k">"PhotoUrl"</span>: <span class="s">"/photos/c7e0b9a1-3f54-4d8a-9e21-7b6c5d4e3f20.jpg"</span>,
+  <span class="k">"ReportedAt"</span>: <span class="s">"2026-06-10T16:45:00Z"</span>
+}</pre>
+
+    <div class="lbl-row"><span class="tag mongo">MONGODB · <code>heatmap_cells</code></span> <span style="color:var(--muted);font-size:12px;">(HeatmapSyncService agrupa por geohash y acumula)</span></div>
+    <p>Ambos reportes (el avistamiento en <code>-34.6671,-58.7259</code> y la info en <code>-34.6680,-58.7271</code>) caen, al redondear a 2 decimales, en la <strong>misma celda</strong> <code>-34.67:-58.73</code> (≈ 1 km²). La celda acumula los conteos de todos los reportes de esa zona para esa alerta:</p>
+<pre><span class="c">// colección: heatmap_cells — lo que dibuja el mapa de calor</span>
+{
+  <span class="k">"_id"</span>: <span class="s">"6669a1f4c3b2a14d7e8f0021|-34.67:-58.73"</span>,  <span class="c">// {alertId}|{geohash}</span>
+  <span class="k">"AlertId"</span>: <span class="s">"6669a1f4c3b2a14d7e8f0021"</span>,
+  <span class="k">"CenterLatitude"</span>: <span class="num">-34.67</span>,
+  <span class="k">"CenterLongitude"</span>: <span class="num">-58.73</span>,
+  <span class="k">"AwarenessCount"</span>: <span class="num">37</span>,                 <span class="c">// avistamientos acumulados en la celda</span>
+  <span class="k">"InfoCount"</span>: <span class="num">2</span>,                       <span class="c">// reportes con información</span>
+  <span class="k">"WeightedIntensity"</span>: <span class="num">43.0</span>,           <span class="c">// = 2×3 + 37×1</span>
+  <span class="k">"LastUpdated"</span>: <span class="s">"2026-06-10T16:45:12Z"</span>
+}</pre>
+    <p class="step-into">+ se actualiza también la <strong>celda global</strong> <code>"global|-34.67:-58.73"</code> (mismas coordenadas, <code>AlertId: null</code>), que combina todas las alertas.</p>
+
+    <div class="callout mongo">
+      <span class="lbl">El mismo id, distintos roles</span>
+      El reporte de info viaja con el id <code>b2c1d4e5-…</code> por Cassandra y llega a <code>info_reports</code> con ese mismo id (relación 1:1, <em>linaje</em>). En <code>heatmap_cells</code>, en cambio, el id del reporte ya se «disuelve»: la celda solo guarda <strong>conteos agregados</strong> por zona, no reportes individuales.
+    </div>
+
+    <!-- ============ RESUMEN ============ -->
+    <h2><span class="n">5</span>Resumen: qué quedó escrito y dónde</h2>
+    <table>
+      <thead><tr><th>Acción</th><th>Motor · estructura</th><th>Cuándo</th></tr></thead>
+      <tbody>
+        <tr><td>Alta de la alerta</td><td><span class="tag mongo">Mongo</span> <code>alerts</code> + <code>admin_activity</code> + disco + FCM</td><td>en el request</td></tr>
+        <tr><td>«Estoy enterado»</td><td><span class="tag cass">Cassandra</span> <code>citizen_reports</code> + <code>citizen_reports_by_time</code></td><td>en el request</td></tr>
+        <tr><td>Aporte de información</td><td><span class="tag cass">Cassandra</span> las 2 anteriores + <code>info_reports_sync</code> + disco</td><td>en el request</td></tr>
+        <tr><td>Mapa de calor</td><td><span class="tag mongo">Mongo</span> <code>heatmap_cells</code> (alerta + global)</td><td>≤ 15 s después (sync)</td></tr>
+        <tr><td>Detalle de info</td><td><span class="tag mongo">Mongo</span> <code>info_reports</code></td><td>≤ 15 s después (sync)</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout">
+      <span class="lbl">Hilo conductor</span>
+      Todo se enlaza por <code>alertId = 6669a1f4c3b2a14d7e8f0021</code>. El reporte con información mantiene su <code>id = b2c1d4e5-…</code> desde Cassandra hasta <code>info_reports</code> en Mongo. Las escrituras son inmediatas; la vista analítica (heatmap e info en Mongo) llega con la consistencia eventual de ~15 s.
+    </div>
+
+  </div>
+  <footer>
+    SafeSight · Grupo 5 · Ingeniería de Datos II — 2026. Ejemplos derivados del esquema real del backend (<code>ReportsRepository</code>, <code>AlertsService</code>, <code>SafeSightDbContext</code>, background services). Escenario realista con datos personales ilustrativos para demostración académica.
+  </footer>
+</div>
+</body>
+</html>

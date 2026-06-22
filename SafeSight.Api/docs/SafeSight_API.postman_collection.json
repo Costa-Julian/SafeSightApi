@@ -17,6 +17,12 @@
       "value": "",
       "type": "string",
       "description": "ID de alerta. Se auto-completa al ejecutar 'Crear nueva alerta'."
+    },
+    {
+      "key": "avistamientosPorAlerta",
+      "value": "100",
+      "type": "string",
+      "description": "Cantidad de avistamientos ('estoy enterado') que siembra cada request de la carpeta 'Seed ciudades' por cada alerta."
     }
   ],
   "item": [
@@ -232,6 +238,66 @@
     {
       "name": "Reports",
       "description": "Gestión de reportes ciudadanos. Los reportes de awareness se almacenan en Cassandra. Los de tipo info también se sincronizan a MongoDB cada ~15 segundos.",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Garantiza una alerta válida antes de cada request de reportes.",
+              "// Si {{alertId}} está vacío o ya no existe en el servidor (sesión vieja o",
+              "// seed reseteado), crea una alerta fresca y la guarda. Esto evita que los",
+              "// reportes se 'peguen' a alertas viejas que ya habíamos creado.",
+              "const baseUrl = pm.collectionVariables.get('baseUrl');",
+              "const alertId = pm.collectionVariables.get('alertId');",
+              "",
+              "function crearAlertaFresca(done) {",
+              "    const hace7dias = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();",
+              "    pm.sendRequest({",
+              "        url: baseUrl + '/api/alerts',",
+              "        method: 'POST',",
+              "        body: {",
+              "            mode: 'formdata',",
+              "            formdata: [",
+              "                { key: 'firstName', value: 'Juan' },",
+              "                { key: 'lastName', value: 'Pérez' },",
+              "                { key: 'age', value: '35' },",
+              "                { key: 'physicalDescription', value: 'Hombre de 1.75m, cabello castaño.' },",
+              "                { key: 'situation', value: 'Visto por última vez en el centro de la ciudad.' },",
+              "                { key: 'latitude', value: '-34.6037' },",
+              "                { key: 'longitude', value: '-58.3816' },",
+              "                { key: 'disappearanceDate', value: hace7dias },",
+              "                { key: 'emitterId', value: '1' }",
+              "            ]",
+              "        }",
+              "    }, function (err, res) {",
+              "        if (!err && res.code === 201 && res.json().success) {",
+              "            const nuevoId = res.json().data.id;",
+              "            pm.collectionVariables.set('alertId', nuevoId);",
+              "            console.log('Alerta fresca creada para el reporte:', nuevoId);",
+              "        } else {",
+              "            console.warn('No se pudo crear la alerta fresca automáticamente.');",
+              "        }",
+              "        done();",
+              "    });",
+              "}",
+              "",
+              "if (!alertId) {",
+              "    crearAlertaFresca(function () {});",
+              "} else {",
+              "    // Verifica que la alerta todavía exista en el servidor.",
+              "    pm.sendRequest(baseUrl + '/api/alerts/' + alertId, function (err, res) {",
+              "        if (err || res.code === 404 || !(res.json() && res.json().success)) {",
+              "            crearAlertaFresca(function () {});",
+              "        } else {",
+              "            console.log('Reutilizando alerta existente:', alertId);",
+              "        }",
+              "    });",
+              "}"
+            ]
+          }
+        }
+      ],
       "item": [
         {
           "name": "Crear reporte de awareness (avistamiento)",
@@ -245,7 +311,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"alertId\": \"{{alertId}}\",\n  \"latitude\": -34.6045,\n  \"longitude\": -58.3850,\n  \"reportedAt\": \"2026-06-10T14:30:00\"\n}",
+              "raw": "{\n  \"alertId\": \"{{alertId}}\",\n  \"latitude\": -34.6045,\n  \"longitude\": -58.3850,\n  \"reportedAt\": \"{{$isoTimestamp}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -301,9 +367,9 @@
                 },
                 {
                   "key": "reportedAt",
-                  "value": "2026-06-10T15:00:00",
+                  "value": "{{$isoTimestamp}}",
                   "type": "text",
-                  "description": "Fecha y hora del reporte (ISO 8601)"
+                  "description": "Fecha y hora del reporte (ISO 8601). Dinámico: usa el instante actual para que los sync services (heatmap / info_reports) siempre lo procesen."
                 },
                 {
                   "key": "photo",
@@ -537,6 +603,328 @@
               "path": ["api", "notifications", "register-token"]
             },
             "description": "Registra un token FCM de un dispositivo móvil para recibir notificaciones push cuando se crea una nueva alerta. Roles: \"citizen\", \"entity\"."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Seed ciudades (4 alertas + avistamientos)",
+      "description": "Crea 4 alertas nuevas, una en cada ciudad (Rosario, Mar del Plata, Quilmes y Paraná/Entre Ríos), y cada una siembra automáticamente N avistamientos ('estoy enterado') dispersos ~±3 km alrededor del centro de la ciudad. N se controla con la variable de colección 'avistamientosPorAlerta' (default 100). Ejecutá los 4 requests (o corré la carpeta con el Runner). Mirá la consola de Postman (View → Show Postman Console) para el progreso.",
+      "item": [
+        {
+          "name": "Rosario — alerta + avistamientos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const baseUrl = pm.collectionVariables.get('baseUrl');",
+                  "const N = parseInt(pm.collectionVariables.get('avistamientosPorAlerta') || '100', 10);",
+                  "const lat0 = -32.9442;  // centro de Rosario",
+                  "const lon0 = -60.6505;",
+                  "const ciudad = 'Rosario';",
+                  "",
+                  "const json = pm.response.json();",
+                  "if (!json || !json.success || !json.data || !json.data.id) {",
+                  "    console.error('No se pudo crear la alerta de ' + ciudad + '. Se aborta el seed.');",
+                  "} else {",
+                  "    const alertId = json.data.id;",
+                  "    pm.collectionVariables.set('alertId', alertId);",
+                  "    console.log('Alerta de ' + ciudad + ' creada: ' + alertId + '. Sembrando ' + N + ' avistamientos...');",
+                  "    let ok = 0, fail = 0;",
+                  "    const enviar = function (i) {",
+                  "        if (i >= N) {",
+                  "            console.log(ciudad + ': avistamientos OK=' + ok + ' FAIL=' + fail + ' (de ' + N + ').');",
+                  "            pm.test(ciudad + ': ' + ok + '/' + N + ' avistamientos creados', function () {",
+                  "                pm.expect(ok).to.be.at.least(N);",
+                  "            });",
+                  "            return;",
+                  "        }",
+                  "        const lat = lat0 + (Math.random() - 0.5) * 0.06;  // dispersion ~±3 km",
+                  "        const lon = lon0 + (Math.random() - 0.5) * 0.06;",
+                  "        pm.sendRequest({",
+                  "            url: baseUrl + '/api/reports/awareness',",
+                  "            method: 'POST',",
+                  "            header: { 'Content-Type': 'application/json' },",
+                  "            body: { mode: 'raw', raw: JSON.stringify({",
+                  "                alertId: alertId,",
+                  "                latitude: lat,",
+                  "                longitude: lon,",
+                  "                reportedAt: new Date().toISOString()",
+                  "            }) }",
+                  "        }, function (err, res) {",
+                  "            if (!err && res && res.code === 200) { ok++; } else { fail++; }",
+                  "            enviar(i + 1);",
+                  "        });",
+                  "    };",
+                  "    enviar(0);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "firstName", "value": "María", "type": "text" },
+                { "key": "lastName", "value": "Gómez", "type": "text" },
+                { "key": "age", "value": "28", "type": "text" },
+                { "key": "physicalDescription", "value": "Mujer de 1.65m, cabello castaño largo, campera de jean.", "type": "text" },
+                { "key": "situation", "value": "Vista por última vez cerca del Monumento a la Bandera, Rosario.", "type": "text" },
+                { "key": "latitude", "value": "-32.9442", "type": "text" },
+                { "key": "longitude", "value": "-60.6505", "type": "text" },
+                { "key": "disappearanceDate", "value": "2026-06-05T08:00:00", "type": "text" },
+                { "key": "emitterId", "value": "1", "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/alerts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "alerts"]
+            },
+            "description": "Crea la alerta de Rosario y, en el test-script, siembra {{avistamientosPorAlerta}} avistamientos alrededor del centro de la ciudad."
+          },
+          "response": []
+        },
+        {
+          "name": "Mar del Plata — alerta + avistamientos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const baseUrl = pm.collectionVariables.get('baseUrl');",
+                  "const N = parseInt(pm.collectionVariables.get('avistamientosPorAlerta') || '100', 10);",
+                  "const lat0 = -38.0055;  // centro de Mar del Plata",
+                  "const lon0 = -57.5426;",
+                  "const ciudad = 'Mar del Plata';",
+                  "",
+                  "const json = pm.response.json();",
+                  "if (!json || !json.success || !json.data || !json.data.id) {",
+                  "    console.error('No se pudo crear la alerta de ' + ciudad + '. Se aborta el seed.');",
+                  "} else {",
+                  "    const alertId = json.data.id;",
+                  "    pm.collectionVariables.set('alertId', alertId);",
+                  "    console.log('Alerta de ' + ciudad + ' creada: ' + alertId + '. Sembrando ' + N + ' avistamientos...');",
+                  "    let ok = 0, fail = 0;",
+                  "    const enviar = function (i) {",
+                  "        if (i >= N) {",
+                  "            console.log(ciudad + ': avistamientos OK=' + ok + ' FAIL=' + fail + ' (de ' + N + ').');",
+                  "            pm.test(ciudad + ': ' + ok + '/' + N + ' avistamientos creados', function () {",
+                  "                pm.expect(ok).to.be.at.least(N);",
+                  "            });",
+                  "            return;",
+                  "        }",
+                  "        const lat = lat0 + (Math.random() - 0.5) * 0.06;  // dispersion ~±3 km",
+                  "        const lon = lon0 + (Math.random() - 0.5) * 0.06;",
+                  "        pm.sendRequest({",
+                  "            url: baseUrl + '/api/reports/awareness',",
+                  "            method: 'POST',",
+                  "            header: { 'Content-Type': 'application/json' },",
+                  "            body: { mode: 'raw', raw: JSON.stringify({",
+                  "                alertId: alertId,",
+                  "                latitude: lat,",
+                  "                longitude: lon,",
+                  "                reportedAt: new Date().toISOString()",
+                  "            }) }",
+                  "        }, function (err, res) {",
+                  "            if (!err && res && res.code === 200) { ok++; } else { fail++; }",
+                  "            enviar(i + 1);",
+                  "        });",
+                  "    };",
+                  "    enviar(0);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "firstName", "value": "Carlos", "type": "text" },
+                { "key": "lastName", "value": "Fernández", "type": "text" },
+                { "key": "age", "value": "45", "type": "text" },
+                { "key": "physicalDescription", "value": "Hombre de 1.80m, barba canosa, campera azul.", "type": "text" },
+                { "key": "situation", "value": "Visto por última vez en la zona del puerto, Mar del Plata.", "type": "text" },
+                { "key": "latitude", "value": "-38.0055", "type": "text" },
+                { "key": "longitude", "value": "-57.5426", "type": "text" },
+                { "key": "disappearanceDate", "value": "2026-06-04T19:30:00", "type": "text" },
+                { "key": "emitterId", "value": "2", "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/alerts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "alerts"]
+            },
+            "description": "Crea la alerta de Mar del Plata y siembra {{avistamientosPorAlerta}} avistamientos alrededor del centro de la ciudad."
+          },
+          "response": []
+        },
+        {
+          "name": "Quilmes — alerta + avistamientos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const baseUrl = pm.collectionVariables.get('baseUrl');",
+                  "const N = parseInt(pm.collectionVariables.get('avistamientosPorAlerta') || '100', 10);",
+                  "const lat0 = -34.7203;  // centro de Quilmes",
+                  "const lon0 = -58.2654;",
+                  "const ciudad = 'Quilmes';",
+                  "",
+                  "const json = pm.response.json();",
+                  "if (!json || !json.success || !json.data || !json.data.id) {",
+                  "    console.error('No se pudo crear la alerta de ' + ciudad + '. Se aborta el seed.');",
+                  "} else {",
+                  "    const alertId = json.data.id;",
+                  "    pm.collectionVariables.set('alertId', alertId);",
+                  "    console.log('Alerta de ' + ciudad + ' creada: ' + alertId + '. Sembrando ' + N + ' avistamientos...');",
+                  "    let ok = 0, fail = 0;",
+                  "    const enviar = function (i) {",
+                  "        if (i >= N) {",
+                  "            console.log(ciudad + ': avistamientos OK=' + ok + ' FAIL=' + fail + ' (de ' + N + ').');",
+                  "            pm.test(ciudad + ': ' + ok + '/' + N + ' avistamientos creados', function () {",
+                  "                pm.expect(ok).to.be.at.least(N);",
+                  "            });",
+                  "            return;",
+                  "        }",
+                  "        const lat = lat0 + (Math.random() - 0.5) * 0.06;  // dispersion ~±3 km",
+                  "        const lon = lon0 + (Math.random() - 0.5) * 0.06;",
+                  "        pm.sendRequest({",
+                  "            url: baseUrl + '/api/reports/awareness',",
+                  "            method: 'POST',",
+                  "            header: { 'Content-Type': 'application/json' },",
+                  "            body: { mode: 'raw', raw: JSON.stringify({",
+                  "                alertId: alertId,",
+                  "                latitude: lat,",
+                  "                longitude: lon,",
+                  "                reportedAt: new Date().toISOString()",
+                  "            }) }",
+                  "        }, function (err, res) {",
+                  "            if (!err && res && res.code === 200) { ok++; } else { fail++; }",
+                  "            enviar(i + 1);",
+                  "        });",
+                  "    };",
+                  "    enviar(0);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "firstName", "value": "Lucía", "type": "text" },
+                { "key": "lastName", "value": "Martínez", "type": "text" },
+                { "key": "age", "value": "19", "type": "text" },
+                { "key": "physicalDescription", "value": "Mujer de 1.60m, pelo negro corto, mochila roja.", "type": "text" },
+                { "key": "situation", "value": "Vista por última vez cerca de la estación de Quilmes.", "type": "text" },
+                { "key": "latitude", "value": "-34.7203", "type": "text" },
+                { "key": "longitude", "value": "-58.2654", "type": "text" },
+                { "key": "disappearanceDate", "value": "2026-06-06T12:00:00", "type": "text" },
+                { "key": "emitterId", "value": "1", "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/alerts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "alerts"]
+            },
+            "description": "Crea la alerta de Quilmes y siembra {{avistamientosPorAlerta}} avistamientos alrededor del centro de la ciudad."
+          },
+          "response": []
+        },
+        {
+          "name": "Entre Ríos (Paraná) — alerta + avistamientos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const baseUrl = pm.collectionVariables.get('baseUrl');",
+                  "const N = parseInt(pm.collectionVariables.get('avistamientosPorAlerta') || '100', 10);",
+                  "const lat0 = -31.7319;  // centro de Paraná (Entre Ríos)",
+                  "const lon0 = -60.5238;",
+                  "const ciudad = 'Paraná (Entre Ríos)';",
+                  "",
+                  "const json = pm.response.json();",
+                  "if (!json || !json.success || !json.data || !json.data.id) {",
+                  "    console.error('No se pudo crear la alerta de ' + ciudad + '. Se aborta el seed.');",
+                  "} else {",
+                  "    const alertId = json.data.id;",
+                  "    pm.collectionVariables.set('alertId', alertId);",
+                  "    console.log('Alerta de ' + ciudad + ' creada: ' + alertId + '. Sembrando ' + N + ' avistamientos...');",
+                  "    let ok = 0, fail = 0;",
+                  "    const enviar = function (i) {",
+                  "        if (i >= N) {",
+                  "            console.log(ciudad + ': avistamientos OK=' + ok + ' FAIL=' + fail + ' (de ' + N + ').');",
+                  "            pm.test(ciudad + ': ' + ok + '/' + N + ' avistamientos creados', function () {",
+                  "                pm.expect(ok).to.be.at.least(N);",
+                  "            });",
+                  "            return;",
+                  "        }",
+                  "        const lat = lat0 + (Math.random() - 0.5) * 0.06;  // dispersion ~±3 km",
+                  "        const lon = lon0 + (Math.random() - 0.5) * 0.06;",
+                  "        pm.sendRequest({",
+                  "            url: baseUrl + '/api/reports/awareness',",
+                  "            method: 'POST',",
+                  "            header: { 'Content-Type': 'application/json' },",
+                  "            body: { mode: 'raw', raw: JSON.stringify({",
+                  "                alertId: alertId,",
+                  "                latitude: lat,",
+                  "                longitude: lon,",
+                  "                reportedAt: new Date().toISOString()",
+                  "            }) }",
+                  "        }, function (err, res) {",
+                  "            if (!err && res && res.code === 200) { ok++; } else { fail++; }",
+                  "            enviar(i + 1);",
+                  "        });",
+                  "    };",
+                  "    enviar(0);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "firstName", "value": "Jorge", "type": "text" },
+                { "key": "lastName", "value": "López", "type": "text" },
+                { "key": "age", "value": "60", "type": "text" },
+                { "key": "physicalDescription", "value": "Hombre de 1.72m, canoso, camisa a cuadros.", "type": "text" },
+                { "key": "situation", "value": "Visto por última vez en la costanera de Paraná, Entre Ríos.", "type": "text" },
+                { "key": "latitude", "value": "-31.7319", "type": "text" },
+                { "key": "longitude", "value": "-60.5238", "type": "text" },
+                { "key": "disappearanceDate", "value": "2026-06-03T10:15:00", "type": "text" },
+                { "key": "emitterId", "value": "2", "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/alerts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "alerts"]
+            },
+            "description": "Crea la alerta de Paraná (Entre Ríos) y siembra {{avistamientosPorAlerta}} avistamientos alrededor del centro de la ciudad."
           },
           "response": []
         }
